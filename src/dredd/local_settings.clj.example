@@ -11,3 +11,6 @@
    :admin-pass "admin-password"
    :base-dn "dc=example,dc=com" ;; where to search for users
    :user-login "uid"}) ;; how user login is interpreted in LDAP entry
+
+(def neo4j
+  {:path "./neo-db"})

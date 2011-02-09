@@ -2,4 +2,5 @@ pom.xml
 *jar
 lib
 classes
+neo-db
 *local_settings.clj
