@@ -3,6 +3,20 @@
             [dredd.local-settings])
   (:import [clojure.lang ILookup IFn]))
 
+(comment
+  
+  (neo/with-neo
+    (neo/with-tx
+      (neo/rel? (neo/root))))
+  
+  )
+
+(defn- init-db []
+  (neo/with-neo
+    (neo/with-tx
+      (when-not (neo/rel? (neo/root) :users)
+        (neo/create-child! :users nil)))))
+
 (deftype A [x]
   ILookup
   (valAt [this key] x)

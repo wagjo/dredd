@@ -20,6 +20,13 @@
 
 (def *neo-db* nil)
 
+(def *root* nil)
+
+(defn- name-or-str [x]
+  (if (keyword? x) 
+    (name x) 
+    (str x)))
+
 ;; Public API
 
 (defmacro with-neo [path & body]
@@ -41,7 +48,7 @@
          val#)
        (finally (.finish tx#)))))
 
-(defn top-node []
+(defn root []
   "Get top node"
   (.getReferenceNode *neo-db*))
 
@@ -51,7 +58,67 @@
 
 (def outgoing Direction/OUTGOING)
 
+(defn relationship [n]
+  (proxy [RelationshipType] []
+    (name [] (name n))))
 
+(defn rel?
+  "Returns true if relathinship exists, false otherwise.
+  Allowed arguments besides node:
+  - none - test for any relationship
+  - direction - any relationships with specified direction
+  - type - relationship of specified type with any direction
+  - direction type - relationship of specified type and of specified direction
+  - type & types - relationship of any of specified types with any direction"
+  ([node]
+     (.hasRelationship node))
+  ([node type-or-direction & types]
+     (let [dir (if (= Direction (class type-or-direction))
+                 type-or-direction
+                 both)
+           t (map relationship
+                  (if (= Direction (class type-or-direction))
+                    (do
+                      ;; if multiple types, direction is both
+                      (when (> (count types) 1) (throw (IllegalArgumentException.)))
+                      types)
+                    (cons type-or-direction types)))]
+       (cond
+        (empty t) (.hasRelationship node dir)
+        (= 1 (count t)) (.hasRelationship node (first t) dir)
+        :else (.hasRelationship node (into-array RelationshipType t))))))
+
+(defn set-properties! 
+  "Set a map of properties."
+  [#^PropertyContainer c props]
+  (doseq [[k v] props]
+    ;; TODO support primivives and arrays
+    (.setProperty c (name-or-str k) (or v ""))))
+
+(defn create-relationship! [#^Node from type #^Node to]
+  "Create relationship of a supplied type between from and to"
+  (io!)
+  (.createRelationshipTo from to (relationship type)))
+
+(defn create-node!
+  "Create a new node"
+  ([]
+     (io!)
+     (.createNode *neo-db*))
+  ([props]
+     (doto (create-node!)
+       (set-properties! props))))
+
+(defn create-child!
+  "Creates a node that is a child of the specified parent node
+  (or root node) along the specified relationship.
+  props is a map that defines the properties of the node."
+  ([type props]
+     (create-child! (root) type props))
+  ([node type props]
+     (let [child (create-node!)]
+       (create-relationship! node type child)
+       child)))
 
 ;; old code
 
@@ -76,11 +143,7 @@
 (def all ReturnableEvaluator/ALL)
 (def all-but-start ReturnableEvaluator/ALL_BUT_START_NODE)
 
-(defn name-or-str
-  [x]
-  (if (keyword? x) 
-    (name x) 
-    (str x)))
+
 
 (defn new-node 
   ([] (.createNode *neo*))
