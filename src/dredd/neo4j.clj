@@ -34,10 +34,12 @@
   If path is not supplied, uses path from local_settings.clj"
   (let [npath (if (string? path) path (:path dredd.local-settings/neo4j))
         nbody (if (string? path) body (cons path body))]
-    `(binding [*neo-db* (EmbeddedGraphDatabase. ~npath)]
-       (try
-         ~@nbody
-         (finally (.shutdown *neo-db*))))))
+    `(if *neo-db*
+      (do ~@nbody) ;; we are already in
+      (binding [*neo-db* (EmbeddedGraphDatabase. ~npath)]
+         (try
+           ~@nbody
+           (finally (.shutdown *neo-db*)))))))
 
 (defmacro with-tx [& body]
   "Establish a transaction. If you do not want to commit it, throw an exception"
@@ -95,18 +97,27 @@
                     (.getEndNode (.getSingleRelationship node type outgoing)))]
     (reduce next-node node rel-types)))
 
+(defn array? [x] (-> x class .isArray))
+
 (defn prop 
   "Return a map of properties."
   ([#^PropertyContainer c]
      (let [ks (.getPropertyKeys c)]
-       (into {} (map (fn [k] [(keyword k) (.getProperty c k)]) ks)))))
+       (into {} (map (fn [k] [(keyword k)
+                             (let [v (.getProperty c k)]
+                               (if (array? v)
+                                 (seq v)
+                                 v))]) ks)))))
 
 (defn set-properties! 
   "Set a map of properties."
   [#^PropertyContainer c props]
   (doseq [[k v] props]
     ;; TODO support primivives and arrays
-    (.setProperty c (name-or-str k) (or v ""))))
+    (.setProperty c (name-or-str k)
+                  (if (coll? v)
+                    (into-array String v)
+                    (or v "")))))
 
 (defn create-relationship! [#^Node from type #^Node to]
   "Create relationship of a supplied type between from and to"

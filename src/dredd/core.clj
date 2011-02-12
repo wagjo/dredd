@@ -9,6 +9,7 @@
             [dredd.authentication.ldap :as ldap]
             [dredd.local-settings]
             [dredd.db :as db]
+            [dredd.tests :as tests]
             [ring.adapter.jetty :as adapter])
   (:import [clojure.lang ILookup IFn]))
 
@@ -34,7 +35,7 @@
   (let [user (db/get-user id)]
     [:p
      (db/get-user-name user) " | "
-     [:a {:href "testy"} "Vybrat cvicenie"] " | "
+     [:a {:href "cvicenie"} "Vybrat cvicenie"] " | "
      [:a {:href "hodnotenie"} "Hodnotenie vasej pripravenosti"] " | "     
      [:a {:href "logout"} "Odhlasenie"]]))
 
@@ -60,13 +61,62 @@
   (-> (redirect "main")
       (assoc :session nil)))
 
+(defn- can-take-test [user-id test-id]
+  (let [itest (db/get-itest user-id test-id)]
+    (or (nil? itest) (not (:finished itest)))))
+
+(defn- ovladanie-testu [id t]
+  (when (can-take-test id t)
+    [:a {:href (str "test/" (:id t))} "Vybrat"]))
+
+(defn- list-tests [id]
+  (html
+   (html5
+    [:body
+     [:h1 "Zoznam cviceni"]
+     (map
+      (fn [t] [:p (:name t) " | " (ovladanie-testu id (:id t))])
+      tests/tests)])))
+
+(defn- print-question-active [q]
+  [:div :hr
+   [:p "Otazka c." (:id q)]
+   [:p (:name q)]
+   [:p (:text q)]])
+
+(defn- take-test [{:keys [id]} test-id]
+  #_(let [itest (or (db/get-itest id test-id)
+                   (db/add-itest id (db/get-test test-id)))
+        user (db/get-user id)]
+    (html
+     (html5
+      [:body
+       [:h1 (:name itest)]
+       (if id
+         (if (:finished itest)
+           [:p "Uz ste test vykonali!"]
+           (map print-question-active itest))
+         [:p "You are not logged in!"])]))))
+
+(defmacro with-user [id & body]
+  `(if ~id
+     (do ~@body)
+     {:status  403
+      :headers {}
+      :body    ""}))
+
 ;; Page layout
 
 (defroutes main-routes
   (GET "/" []
        (redirect "/prog/main"))
-  (GET "/main" {:keys [session]}
+  (GET "/main" {session :session}
        (main-page session))
+  (GET "/cvicenie" {{id :id} :session}
+       (with-user id
+         (list-tests id)))
+  (GET "/test/:test-id" {:keys [session route-params] :as r}
+       (take-test session (:test-id route-params)))
   ;; TODO hodnotenie
   (GET "/logout" []
        (logout))
