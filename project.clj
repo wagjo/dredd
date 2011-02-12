@@ -2,6 +2,9 @@
   :description "FIXME: write"
   :dependencies [[org.clojure/clojure "1.2.0"]
                  [org.clojure/clojure-contrib "1.2.0"]
-                 [com.unboundid/unboundid-ldapsdk "2.0.0"]
-                 [org.neo4j/neo4j "1.2"]]
+                 [clj-ldap "0.0.2"]
+                 [org.neo4j/neo4j "1.2"]
+                 [compojure "0.6.0-RC4"]
+                 [ring/ring-jetty-adapter "0.3.5"]
+                 [hiccup "0.3.4"]]
   :dev-dependencies [[swank-clojure "1.2.1"]])

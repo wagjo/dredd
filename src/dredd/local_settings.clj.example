@@ -3,14 +3,20 @@
 (ns dredd.local-settings
   "This namespace stores all local settings for the application")
 
+;; admin settings
+(def admin
+  {:username "admin"
+   :password "admin"})
+
+;; neo4j settings
+(def neo4j
+  {:path "neo-db"})
+
 ;; settings for LDAP authentication
 (def ldap
-  {:host "localhost"
-   :port 636
-   :admin-dn "uid=admin-user-name,ou=admin,dc=example,dc=com"
-   :admin-pass "admin-password"
-   :base-dn "dc=example,dc=com" ;; where to search for users
-   :user-login "uid"}) ;; how user login is interpreted in LDAP entry
-
-(def neo4j
-  {:path "./neo-db"})
+  {:host "ldap.example.com:636"
+   :ssl? true
+   :connect-timeout 5000
+   :timeout 5000
+   :user-to-bind-dn (fn [user] (str "uid=" user ",ou=person,dc=example,dc=com")) 
+   })

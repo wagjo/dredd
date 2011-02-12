@@ -84,9 +84,22 @@
                       types)
                     (cons type-or-direction types)))]
        (cond
-        (empty t) (.hasRelationship node dir)
+        (empty? t) (.hasRelationship node dir)
         (= 1 (count t)) (.hasRelationship node (first t) dir)
         :else (.hasRelationship node (into-array RelationshipType t))))))
+
+(defn go [node & types]
+  "Walk through the graph by following specified relations"
+  (let [rel-types (map relationship types)
+        next-node (fn [node type]
+                    (.getEndNode (.getSingleRelationship node type outgoing)))]
+    (reduce next-node node rel-types)))
+
+(defn prop 
+  "Return a map of properties."
+  ([#^PropertyContainer c]
+     (let [ks (.getPropertyKeys c)]
+       (into {} (map (fn [k] [(keyword k) (.getProperty c k)]) ks)))))
 
 (defn set-properties! 
   "Set a map of properties."
@@ -116,7 +129,7 @@
   ([type props]
      (create-child! (root) type props))
   ([node type props]
-     (let [child (create-node!)]
+     (let [child (create-node! props)]
        (create-relationship! node type child)
        child)))
 

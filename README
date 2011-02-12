@@ -4,7 +4,17 @@ FIXME: write description
 
 ## Usage
 
-FIXME: write
+starting:
+
+screen ./start.sh
+
+then press C-a d
+
+shutdown:
+
+resume with screen -r
+
+then C-c to shutdown server
 
 ## License
 
