@@ -79,3 +79,9 @@
           (when-not (get-user user-id)
             (add-user! auth-user))
           user-id)))))
+
+(defn set-user-group! [user-id group]
+  (when (and group (not (empty? group)))
+    (neo/with-neo
+      (neo/with-tx
+        (neo/set-properties! (get-user-node user-id) {:group group})))))

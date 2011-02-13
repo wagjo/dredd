@@ -15,6 +15,11 @@
 
 ;; Main
 
+(defn- choose-group []
+  (form-to [:post "set-group"]
+           [:p "Vyberte si skupinu, do ktorej patrite: " (drop-down :group ["Pondelok 7:30" "Pondelok 13:30" "Streda 15:10"])]
+           (submit-button "Pokracovat")))
+
 (defn- login-form []
   (form-to [:post "login"]
            [:p "Username: " (text-field :username "")]
@@ -35,7 +40,10 @@
      [:h1 "Zistovanie pripravenosti studentov na cvicenia z predmetu Programovanie"] ;; NOTE: localization
      (when message [:p [:b message]])
      (if user-id
-       (user-menu user-id)
+       (let [user (users/get-user user-id)]
+         (if (or (users/admin? user-id) (:group user))
+           (user-menu user-id)
+           (choose-group)))
        (login-form))])))
 
 ;; Login
@@ -53,6 +61,10 @@
 (defn- logout-page []
   (-> (redirect "main")
       (assoc :session nil)))
+
+(defn- set-group! [user-id group]
+  (users/set-user-group! user-id group)
+  (redirect "main"))
 
 ;; Choosing test
 
@@ -184,6 +196,8 @@
 
 ;; Page layout
 
+;; TODO zaradenie do skupiny
+
 (defroutes main-routes
   (GET "/" []
        (redirect (str (:base-url local-settings/app) "/main")))
@@ -213,6 +227,9 @@
        (logout-page))
   (POST "/login" [username password]
         (login-page! username password))
+  (POST "/set-group" {{user-id :user-id} :session {group :group :as params} :params}
+        (with-user user-id
+          (set-group! user-id group)))
   (route/resources "/")
   (route/not-found "Page not found"))
 
