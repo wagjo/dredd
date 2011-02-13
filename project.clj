@@ -6,5 +6,6 @@
                  [org.neo4j/neo4j "1.2"]
                  [compojure "0.6.0-RC4"]
                  [ring/ring-jetty-adapter "0.3.5"]
-                 [hiccup "0.3.4"]]
+                 [hiccup "0.3.4"]
+                 [clj-time "0.3.0-SNAPSHOT"]]
   :dev-dependencies [[swank-clojure "1.2.1"]])

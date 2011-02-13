@@ -1,4 +1,4 @@
-(ns dredd.questions
+(ns dredd.data.questions
   "List of questions"
   (:use [clojure.contrib.seq-utils :only [find-first]]))
 

@@ -1,4 +1,4 @@
-(ns dredd.neo4j
+(ns dredd.db-adapter.neo4j
   "Neo4j wrapper, forked from hgavin/clojure-neo4j"
   (:require [dredd.local-settings])
   (:import (org.neo4j.graphdb Direction
@@ -113,7 +113,7 @@
   "Set a map of properties."
   [#^PropertyContainer c props]
   (doseq [[k v] props]
-    ;; TODO support primivives and arrays
+    ;; TODO support primivives
     (.setProperty c (name-or-str k)
                   (if (coll? v)
                     (into-array String v)

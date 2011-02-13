@@ -3,6 +3,10 @@
 (ns dredd.local-settings
   "This namespace stores all local settings for the application")
 
+;; app settings
+(def app
+  {:base-url ""}) ;; points to base url, must not end with slash
+
 ;; admin settings
 (def admin
   {:username "admin"

@@ -1,4 +1,4 @@
-(ns dredd.tests
+(ns dredd.data.tests
   "List of tests"
   (:use [clojure.contrib.seq-utils :only [find-first]]))
 
@@ -6,7 +6,7 @@
   [{:id "t1"
     :name "Cvicenie 1"
     :questions ["q1" "q2"]}
-   {:id "t2"
+   #_{:id "t2"
     :name "Cvicenie 2"
     :questions ["q1" "q2"]}])
 
