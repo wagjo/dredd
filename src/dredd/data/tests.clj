@@ -8,7 +8,7 @@
     :questions ["q1" "q2"]}
    #_{:id "t2"
     :name "Cvicenie 2"
-    :quequestionstions ["q1" "q2"]}])
+    :questions ["q1" "q2"]}])
 
 (defn get-test [id]
   (find-first #(= id (:id %)) tests))
