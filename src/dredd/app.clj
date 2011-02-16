@@ -2,14 +2,17 @@
   "App management"
   (:use compojure.core
         ring.util.response
-        [hiccup core page-helpers form-helpers])
+        [hiccup core page-helpers form-helpers]
+        [incanter core excel])
   (:require [compojure.route :as route]
             [compojure.handler :as handler]
             [dredd.data.tests :as tests]
             [dredd.data.itests :as itests]
             [dredd.data.users :as users]
+            [dredd.data.core :as data]
             [dredd.local-settings :as local-settings]
-            [dredd.data.iquestions :as iquestions]))
+            [dredd.data.iquestions :as iquestions]
+            [dredd.db-adapter.neo4j :as neo]))
 
 ;; Implementation details
 
@@ -171,6 +174,44 @@
        [:h1 "Administracia"]
        (map #(admin-user-test % test-id) user-ids)]))))
 
+;; Export
+
+(defn- question-header [test-id question-id]
+  (let [h (str test-id "-" question-id "-")]
+    [(str h "question") (str h "answer") (str h "result")]))
+
+(defn- question-body [user-id test-id question-id]
+  (let [q (iquestions/get-iquestion user-id test-id question-id)]
+    [(:text q) (:answer q) (:result q)]))
+
+(defn- test-header [{test-id :id}]
+  (let [qs (:questions (tests/get-test test-id))]
+    (mapcat (partial question-header test-id) qs)))
+
+(defn- create-sheet-header []
+  (cons "Name:" (mapcat test-header tests/tests)))
+
+(defn user-test-body [user-id {test-id :id}]
+  (let [qs (:questions (tests/get-test test-id))]
+    (mapcat (partial question-body user-id test-id) qs)))
+
+(defn user-row [user-id]
+  (let [u (users/get-user user-id)]
+    (cons (users/get-user-name u)
+          (mapcat (partial user-test-body user-id) tests/tests))))
+
+(defn- create-sheet-body []
+  ;; each user has one row
+  (map user-row (users/get-all-user-ids))
+  )
+
+(defn- admin-export-page []
+    (let [fname "temp.xls"
+          sheet-header (create-sheet-header)
+          sheet-body (create-sheet-body)]
+      (save-xls (dataset sheet-header sheet-body) fname)
+      (file-response fname)))
+
 ;; Middleware
 
 (defmacro with-user [user-id & body]
@@ -218,6 +259,9 @@
        (with-user user-id
          (with-test test-id
            (view-test-page user-id test-id))))
+  (GET "/export.xls" {{user-id :user-id} :session}
+       (with-admin user-id
+         (admin-export-page)))
   (POST "/submit-test" {{user-id :user-id} :session {test-id :test-id :as params} :params}
        (with-user user-id
          (with-test test-id

@@ -21,11 +21,10 @@
 
 (defn get-user-node [id]
   "Get user node"
-  (neo/with-neo
     (first (neo/find-by-props
             (node-users)
             :user
-            {:uid id}))))
+            {:uid id})))
 
 (defn get-user [id]
   "Get user properties"
@@ -33,26 +32,23 @@
     {:cn "Administrator"
      :uid "admin"
      :admin true}
-    (neo/with-neo
       (when-let [result (get-user-node id)]
-        (neo/prop result)))))
+        (neo/prop result))))
 
 (defn get-all-user-ids []
-  (neo/with-neo
     (doall
      (map #(get-user-id (neo/prop %))
           (neo/traverse (node-users)
                         neo/breadth-first
                         (neo/depth-of 1)
                         neo/all-but-start
-                        {:user neo/outgoing})))))
+                        {:user neo/outgoing}))))
 
 (defn add-user! [props]
   "Add user to the database"
   (io!)
-  (neo/with-neo
     (neo/with-tx
-      (neo/create-child! (node-users) :user props))))
+      (neo/create-child! (node-users) :user props)))
 
 (defn login-user! [username password]
   "Authenticate user and add it to database if not in it yet. Return user-id"
@@ -82,6 +78,5 @@
 
 (defn set-user-group! [user-id group]
   (when (and group (not (empty? group)))
-    (neo/with-neo
       (neo/with-tx
-        (neo/set-properties! (get-user-node user-id) {:group group})))))
+        (neo/set-properties! (get-user-node user-id) {:group group}))))

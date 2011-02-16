@@ -29,9 +29,18 @@
 
 ;; Public API
 
+(defn start-neo
+  ([] (start-neo (:path dredd.local-settings/neo4j)))
+  ([path] (let [n (EmbeddedGraphDatabase. path)]
+            (alter-var-root #'*neo-db* (fn [_] n)))))
+
+(defn stop-neo []
+  (.shutdown *neo-db*))
+
 (defmacro with-neo [path & body]
   "Establish a connection to the neo db.
-  If path is not supplied, uses path from local_settings.clj"
+  If path is not supplied, uses path from local_settings.clj
+  Not good when mulitple threads try to access same database"
   (let [npath (if (string? path) path (:path dredd.local-settings/neo4j))
         nbody (if (string? path) body (cons path body))]
     `(if *neo-db*

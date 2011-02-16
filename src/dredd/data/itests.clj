@@ -19,30 +19,35 @@
 
 (defn itest? [user-id test-id]
   "Determine whether user has instance of some test"
-  (neo/with-neo
     (not (empty? (neo/find-by-props
                   (users/get-user-node user-id)
                   :itest
-                  {:id test-id})))))
+                  {:id test-id}))))
 
 (defn get-itest-node [user-id test-id]
   "Get itest node"
-  (neo/with-neo
     (first (neo/find-by-props
             (users/get-user-node user-id)
             :itest
-            {:id test-id}))))
+            {:id test-id})))
 
 (defn get-itest [user-id test-id]
   "Get itest"
-  (neo/with-neo
     (when-let [result (get-itest-node user-id test-id)]
-      (neo/prop result))))
+      (neo/prop result)))
+
+(defn get-all-users-itest-ids [user-id]
+        (doall
+         (map #(:id (neo/prop %))
+              (neo/traverse (users/get-user-node user-id)
+                            neo/breadth-first
+                            (neo/depth-of 1)
+                            neo/all-but-start
+                            {:itest neo/outgoing}))))      
 
 (defn add-itest! [user-id prop]
   "Add new itest, returning its id"
   (io!)
-  (neo/with-neo
     (neo/with-tx
       ;; create itest
       (let [itest (neo/create-child! (users/get-user-node user-id) :itest prop)]
@@ -53,21 +58,18 @@
                 iquestion (neo/create-child! itest :iquestion qprop)]
             (neo/create-relationship! (node-iquestions)
                                       :iquestion iquestion))))
-      prop)))
+      prop))
 
 (defn- submit-question-node! [question-node prop]
   "Submit iquestion"
   (io!)
-  (neo/with-neo
     (neo/with-tx
       (let [question-prop (neo/prop question-node)]
         (neo/set-properties! question-node {:answer ((keyword (:id question-prop)) prop)}))))
-  )
 
 (defn submit-itest! [user-id test-id prop]
   "Submit itest"
   (io!)
-  (neo/with-neo
     (neo/with-tx
       ;; find itest
       (let [itest (get-itest-node user-id test-id)]
@@ -79,4 +81,4 @@
                                 (neo/depth-of 1)
                                 neo/all-but-start
                                 {:iquestion neo/outgoing})]
-          (submit-question-node! q prop))))))
+          (submit-question-node! q prop)))))
