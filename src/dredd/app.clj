@@ -269,6 +269,10 @@
   ;; TODO hodnotenie
   (GET "/logout" []
        (logout-page))
+  (GET "/shutdown" {{user-id :user-id} :session}
+       (with-admin user-id
+         (neo/stop-neo)
+         "you may now stop the server"))  
   (POST "/login" [username password]
         (login-page! username password))
   (POST "/set-group" {{user-id :user-id} :session {group :group :as params} :params}
