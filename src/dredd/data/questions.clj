@@ -22,7 +22,8 @@
     :text #(str "Napiste funkciu, ktora "
                 (rand-nth ["otoci Karola dozadu"
                            "otoci Karola doprava"
-                           "otoci Karola okolo vlastnej osi 1x (360 stupnov)"]))}
+                           "otoci Karola okolo vlastnej osi 1x (360 stupnov)"]) 
+                " iba pomocou zakladnych prikazov karola")}
    {:id "q4"
     :name "Vlastne funkcie - Karol 2"
     :text #(str "Napiste funkciu, ktora "
@@ -30,7 +31,7 @@
                            "pohne Karola 2x dozadu"
                            "pohne Karola o 2 miesta doprava"
                            "pohne Karola o 3 miesta dolava"])
-                " pricom Karol sa po skonceni funkcie musi pozerat tym istym smerom, ako na zaciatku")}])
+                " iba pomocou zakladnych prikazov karola, pricom Karol sa po skonceni funkcie musi pozerat tym istym smerom, ako na zaciatku")}])
 
 (defn get-question [id]
   (find-first #(= id (:id %)) questions))

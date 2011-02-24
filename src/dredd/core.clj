@@ -23,8 +23,10 @@
 
 (defn start-and-wait []
   "start the app and block"
+  (neo/start-neo)
   (data/init!)
-  (adapter/run-jetty app/app {:port 3000}))
+  (adapter/run-jetty app/app {:port 3000})
+  (neo/stop-neo))
 
 ;; Examples
 

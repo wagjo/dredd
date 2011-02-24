@@ -14,3 +14,12 @@
       (doseq [rel-type [:users :itests :iquestions :tests :questions]]
         (when-not (neo/rel? (neo/root) rel-type)
           (neo/create-child! rel-type nil)))))
+
+(defn maintenance? []
+  (:maintenance (neo/prop (neo/root))))
+
+(defn set-maintenance!
+  ([] (set-maintenance! true))
+  ([status] (if status
+              (neo/set-properties! (neo/root) {:maintenance true})
+              (neo/remove-properties! (neo/root) #{:maintenance}))))

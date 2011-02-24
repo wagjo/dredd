@@ -18,7 +18,7 @@
 
 ;; Helper functions
 
-(def *neo-db* nil)
+(defonce *neo-db* nil)
 
 (def *root* nil)
 
@@ -127,6 +127,12 @@
                   (if (coll? v)
                     (into-array String v)
                     (or v "")))))
+
+(defn remove-properties!
+  "Remove a set of properties"
+  [#^PropertyContainer c keys]
+  (doseq [k keys]
+    (.removeProperty c (name-or-str k))))
 
 (defn create-relationship! [#^Node from type #^Node to]
   "Create relationship of a supplied type between from and to"

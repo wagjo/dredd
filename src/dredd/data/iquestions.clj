@@ -7,10 +7,11 @@
 
 (defn get-iquestion-node [user-id test-id question-id]
   "Get iquestion"
+  (when-let [itest (itests/get-itest-node user-id test-id)]
     (first (neo/find-by-props
-            (itests/get-itest-node user-id test-id)
+            itest
             :iquestion
-            {:id question-id})))
+            {:id question-id}))))
 
 (defn get-iquestion [user-id test-id question-id]
   "Get iquestion"

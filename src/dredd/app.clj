@@ -215,7 +215,7 @@
 ;; Middleware
 
 (defmacro with-user [user-id & body]
-  `(if ~user-id
+  `(if (and ~user-id (not (data/maintenance?)))
      (do ~@body)
      {:status  403
       :headers {}
