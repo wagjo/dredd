@@ -12,7 +12,8 @@
             [dredd.data :as data]
             [dredd.local-settings :as local-settings]
             [dredd.data.iquestions :as iquestions]
-            [dredd.db-adapter.neo4j :as neo]))
+            [dredd.db-adapter.neo4j :as neo]
+            [dredd.server :as server]))
 
 ;; Implementation details
 
@@ -164,20 +165,21 @@
 ;; Administrator interface
 
 (defn- rank-iquestion [user-id test-id question-id]
-  (let [q (iquestions/get-iquestion user-id test-id question-id)]    
-    [:div
-     (form-to [:post "../rank-question"]
-              (hidden-field :test-id test-id)
-              (hidden-field :student-id user-id)
-              (hidden-field :question-id question-id)
-              [:p [:b "Question " (:id q) ": "] (:name q)]
-              [:p [:i (:text q)]]
-              [:p [:i "Your answer: "]]
-              [:p [:pre (h (:answer q))]]
-              [:p [:i "Znamka: "] (text-field :result (:result q))]
-              [:p [:i "Poznamka: "] (text-field :comment (:comment q))]
-              [:p (submit-button "Rank")]
-              )]))
+  (let [q (iquestions/get-iquestion user-id test-id question-id)]
+    (when-not (:result q)
+      [:div
+       (form-to [:post "../rank-question"]
+                (hidden-field :test-id test-id)
+                (hidden-field :student-id user-id)
+                (hidden-field :question-id question-id)
+                [:p [:b "Question " (:id q) ": "] (:name q)]
+                [:p [:i (:text q)]]
+                [:p [:i "Your answer: "]]
+                [:p [:pre (h (:answer q))]]
+                [:p [:i "Znamka: "] (text-field :result (:result q))]
+                [:p [:i "Poznamka: "] (text-field :comment (:comment q))]
+                [:p (submit-button "Rank")]
+                )])))
 
 (defn- admin-user-test [user-id test-id]
   (let [user (users/get-user user-id)
@@ -298,7 +300,7 @@
        (logout-page))
   (GET "/shutdown" {{user-id :user-id} :session}
        (with-admin user-id
-         (neo/stop!)
+         (server/shutdown!)
          "you may now stop the server"))
   (POST "/login" [username password]
         (login-page! username password))

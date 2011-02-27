@@ -33,7 +33,11 @@
   "Start dredd"
   (neo/with-db!
     (data/init!)
-    (server/start-and-wait! app/handler)))
+    (server/start-and-wait! app/handler))
+  (shutdown-agents))
+
+(defn -main [& args]
+  (start))
 
 ;;;; Examples
 

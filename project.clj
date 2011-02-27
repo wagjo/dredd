@@ -10,4 +10,5 @@
                  [clj-time "0.3.0-SNAPSHOT"]
                  [incanter "1.2.3"]]
   :dev-dependencies [[swank-clojure "1.2.1"]]
-  :warn-on-reflection true)
+  :warn-on-reflection true
+  :main dredd.core)
