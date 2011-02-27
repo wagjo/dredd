@@ -17,3 +17,9 @@
   "Get iquestion"
     (when-let [result (get-iquestion-node user-id test-id question-id)]
       (neo/prop result)))
+
+(defn rank-iquestion! [user-id test-id question-id result comment]
+  (let [q (get-iquestion-node user-id test-id question-id)]
+    (when q
+      (neo/with-tx
+        (neo/set-properties! q {:result result :comment comment})))))

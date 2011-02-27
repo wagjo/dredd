@@ -29,15 +29,15 @@
 
 ;; Public API
 
-(defn start-neo
-  ([] (start-neo (:path dredd.local-settings/neo4j)))
+(defn start!
+  ([] (start! (:path dredd.local-settings/neo4j)))
   ([path] (let [n (EmbeddedGraphDatabase. path)]
             (alter-var-root #'*neo-db* (fn [_] n)))))
 
-(defn stop-neo []
+(defn stop! []
   (.shutdown *neo-db*))
 
-(defmacro with-neo [path & body]
+(defmacro with-db-old! [path & body]
   "Establish a connection to the neo db.
   If path is not supplied, uses path from local_settings.clj
   Not good when mulitple threads try to access same database"
@@ -49,6 +49,18 @@
          (try
            ~@nbody
            (finally (.shutdown *neo-db*)))))))
+
+(defmacro with-db! [path & body]
+  "Establish a connection to the neo db.
+  If path is not supplied, uses path from local_settings.clj
+  Not good when mulitple threads try to access same database"
+  (let [npath (if (string? path) path (:path dredd.local-settings/neo4j))
+        nbody (if (string? path) body (cons path body))]
+    `(do
+       (start!)
+      (try
+        ~@nbody
+        (finally (stop!))))))
 
 (defmacro with-tx [& body]
   "Establish a transaction. If you do not want to commit it, throw an exception"

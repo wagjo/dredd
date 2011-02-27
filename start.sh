@@ -1,3 +1,3 @@
 #!/bin/sh
 
-java -cp ./dredd-1.0.0-SNAPSHOT-standalone.jar clojure.main -i @/dredd/core.clj -e "(dredd.core/start-and-wait)"
+java -cp ./dredd-0.0.1-SNAPSHOT-standalone.jar clojure.main -i @/dredd/server.clj -e "(dredd.server/start-and-wait)"

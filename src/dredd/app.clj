@@ -9,7 +9,7 @@
             [dredd.data.tests :as tests]
             [dredd.data.itests :as itests]
             [dredd.data.users :as users]
-            [dredd.data.core :as data]
+            [dredd.data :as data]
             [dredd.local-settings :as local-settings]
             [dredd.data.iquestions :as iquestions]
             [dredd.db-adapter.neo4j :as neo]))
@@ -130,7 +130,8 @@
      [:p [:i (:text q)]]
      [:p [:i "Your answer: "]]
      [:p [:pre (h (:answer q))]]
-     [:p [:i "Result: "] (:result q)]]))
+     [:p [:i "Znamka: "] (:result q)]
+     [:p [:i "Poznamka: "] (:comment q)]]))
 
 (defn- view-test-page [user-id test-id]
   (let [itest (itests/get-itest user-id test-id)
@@ -153,7 +154,30 @@
       (assoc :session {:user-id user-id
                        :message "Uspesne odoslane!"})))
 
+;; Rank test
+
+(defn- rank-test! [{:keys [student-id test-id question-id result comment]}]
+  (io!)
+  (iquestions/rank-iquestion! student-id test-id question-id result comment)
+  (redirect (str "admin/" test-id)))
+
 ;; Administrator interface
+
+(defn- rank-iquestion [user-id test-id question-id]
+  (let [q (iquestions/get-iquestion user-id test-id question-id)]    
+    [:div
+     (form-to [:post "../rank-question"]
+              (hidden-field :test-id test-id)
+              (hidden-field :student-id user-id)
+              (hidden-field :question-id question-id)
+              [:p [:b "Question " (:id q) ": "] (:name q)]
+              [:p [:i (:text q)]]
+              [:p [:i "Your answer: "]]
+              [:p [:pre (h (:answer q))]]
+              [:p [:i "Znamka: "] (text-field :result (:result q))]
+              [:p [:i "Poznamka: "] (text-field :comment (:comment q))]
+              [:p (submit-button "Rank")]
+              )]))
 
 (defn- admin-user-test [user-id test-id]
   (let [user (users/get-user user-id)
@@ -164,7 +188,7 @@
      (if (:finished itest)
        [:p "Test finished at " (:finished itest)]
        [:p "Test NOT finished"])
-     (map (partial view-iquestion user-id test-id) (:questions itest))]))
+     (map (partial rank-iquestion user-id test-id) (:questions itest))]))
 
 (defn- admin-test-page [test-id]
   (let [user-ids (users/get-all-user-ids)]
@@ -182,7 +206,7 @@
 
 (defn- question-body [user-id test-id question-id]
   (let [q (iquestions/get-iquestion user-id test-id question-id)]
-    [(:text q) (:answer q) (:result q)]))
+    [(:text q) (:answer q) (str (:result q) "(" (:comment q) ")")]))
 
 (defn- test-header [{test-id :id}]
   (let [qs (:questions (tests/get-test test-id))]
@@ -241,7 +265,7 @@
 
 (defroutes main-routes
   (GET "/" []
-       (redirect (str (:base-url local-settings/app) "/main")))
+       (redirect (str (:base-url local-settings/server) "/main")))
   (GET "/main" {{:keys [user-id message]} :session}
        (main-page user-id message))
   (GET "/choose" {{user-id :user-id} :session}
@@ -265,31 +289,28 @@
   (POST "/submit-test" {{user-id :user-id} :session {test-id :test-id :as params} :params}
        (with-user user-id
          (with-test test-id
-           (submit-test! user-id test-id params))))  
+           (submit-test! user-id test-id params))))
+  (POST "/rank-question" {{user-id :user-id} :session {test-id :test-id :as params} :params}
+       (with-admin user-id
+         (rank-test! params)))  
   ;; TODO hodnotenie
   (GET "/logout" []
        (logout-page))
   (GET "/shutdown" {{user-id :user-id} :session}
        (with-admin user-id
-         (neo/stop-neo)
-         "you may now stop the server"))  
+         (neo/stop!)
+         "you may now stop the server"))
   (POST "/login" [username password]
         (login-page! username password))
   (POST "/set-group" {{user-id :user-id} :session {group :group :as params} :params}
         (with-user user-id
           (set-group! user-id group)))
+  (POST "/user-do" [])
   (route/resources "/")
   (route/not-found "Page not found"))
 
 ;; Main App handler
 
-(def app
+(def handler
   (handler/site main-routes))
 
-;; Examples
-
-(comment
-
-
-  
-)

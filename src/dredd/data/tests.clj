@@ -8,7 +8,10 @@
     :questions ["q1" "q2"]}
    {:id "t2"
     :name "Cvicenie 2"
-    :questions ["q3" "q4"]}])
+    :questions ["q3" "q4"]}
+   {:id "t3"
+    :name "Cvicenie 3"
+    :questions ["q5" "q6"]}])
 
 (defn get-test [id]
   (find-first #(= id (:id %)) tests))

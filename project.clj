@@ -1,5 +1,5 @@
-(defproject dredd "1.0.0-SNAPSHOT"
-  :description "FIXME: write"
+(defproject dredd "0.0.1-SNAPSHOT"
+  :description "Simple Online Automated Judge System in Clojure"
   :dependencies [[org.clojure/clojure "1.2.0"]
                  [org.clojure/clojure-contrib "1.2.0"]
                  [clj-ldap "0.0.2"]
@@ -9,4 +9,5 @@
                  [hiccup "0.3.4"]
                  [clj-time "0.3.0-SNAPSHOT"]
                  [incanter "1.2.3"]]
-  :dev-dependencies [[swank-clojure "1.2.1"]])
+  :dev-dependencies [[swank-clojure "1.2.1"]]
+  :warn-on-reflection true)

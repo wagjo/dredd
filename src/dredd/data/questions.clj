@@ -31,7 +31,24 @@
                            "pohne Karola 2x dozadu"
                            "pohne Karola o 2 miesta doprava"
                            "pohne Karola o 3 miesta dolava"])
-                " iba pomocou zakladnych prikazov karola, pricom Karol sa po skonceni funkcie musi pozerat tym istym smerom, ako na zaciatku")}])
+                " iba pomocou zakladnych prikazov karola, pricom Karol sa po skonceni funkcie musi pozerat tym istym smerom, ako na zaciatku")}
+   {:id "q5"
+    :name "Funkcie s parametrom - Karol 3"
+    :text #(str "Napiste funkciu, ktora ma jeden vstupny parameter x, typu int. Tato funkcia nech "
+                (rand-nth ["pohne Karola x krokov dozadu"
+                           "pohne Karola x krokov do prava (relativne od smeru akym sa karol pozera)"
+                           "pohne Karola x krokov do lava (relativne od smeru akym sa karol pozera)"])
+                ". Pouzite iba zakladne prikazy Karola a jazyka C, "
+                "pricom Karol sa po skonceni funkcie musi pozerat tym istym smerom, ako na zaciatku")}
+   {:id "q6"
+    :name "Funkcie s parametrom - Karol 4"
+    :text #(str "Napiste funkciu, ktora "
+                (rand-nth ["polozi vsetky beepre z Karolovho batohu na zem do miestnosti"
+                           "zoberie vsetky beepre z miestnosti do Karolovho batoha"
+                           "bude hybat s Karolom dopredu, pokial bude mat Karol po pravej 'ruke' stenu"
+                           "bude hybat s Karolom dopredu, pokial bude mat Karol po lavej 'ruke' stenu"
+                           "bude hybat s Karolom dopredu, az kym nenajde na zemi beeper"])
+                ". Pouzite iba zakladne prikazy Karola a jazyka C.")}])
 
 (defn get-question [id]
   (find-first #(= id (:id %)) questions))
