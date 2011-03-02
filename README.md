@@ -19,6 +19,9 @@ Simple Online Automated Judge System in Clojure. Mainly used in my Programming c
 
 * Hint: Start dredd on a dedicated port and use reverse proxy to make it public. That way you can also enable TLS for dredd.
 
+* Developer Hint: Do not forget to set UTF-8 in emacs
+    * M-x customize-group slime-lisp "Slime Net Coding System" utf-8-linux "Save for Future Sessions"
+
 ## Documentation
 
 As this is a literate programming attempt, documentation is in sources
