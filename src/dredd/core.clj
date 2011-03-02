@@ -43,8 +43,7 @@
 
 (comment
   
-  (start)                               ; Start dredd
-
-  (server/shutdown!)                    ; Shutdown dredd
+  (start)
+  (server/shutdown!)
   
 )

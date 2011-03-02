@@ -40,6 +40,7 @@
 (defn- main-page [user-id message]
   (html
    (html5
+    [:head [:meta {:charset "UTF-8"}]]
     [:body
      [:h1 "Zistovanie pripravenosti studentov na cvicenia z predmetu Programovanie"] ;; NOTE: localization
      (when message [:p [:b message]])
@@ -253,7 +254,6 @@
   ;; each user has one row
   (map user-row (users/get-all-user-ids))
   )
-
 (defn- admin-export-page []
     (let [fname "temp.xls"
           sheet-header (create-sheet-header)
@@ -337,8 +337,14 @@
   (route/resources "/")
   (route/not-found "Page not found"))
 
+(defn wrap-utf8
+  [handler]
+  (fn [request]
+    (-> (handler request)
+        (content-type "text/html; charset=utf-8"))))
+
 ;; Main App handler
 
 (def handler
-  (handler/site main-routes))
-
+     (-> (handler/site main-routes)
+         (wrap-utf8)))
