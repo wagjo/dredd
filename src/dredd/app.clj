@@ -162,10 +162,27 @@
   (iquestions/rank-iquestion! student-id test-id question-id result comment)
   (redirect (str "admin/" test-id)))
 
+;; Manage users
+
+(defn- print-user [user-id]
+  (let [user (users/get-user user-id)]
+    [:div
+     [:hr]
+     [:p "Id: " [:b (:uid user)]]
+     [:p "Name: " [:b (:givenName user)]]
+     [:p "Surname: " [:b (:sn user)]]]))
+
+(defn- manage-users []
+  (html
+   (html5
+    [:body
+     [:h1 "User management"]
+     (map print-user (users/get-all-user-ids))])))
+
 ;; Administrator interface
 
 (defn- rank-iquestion [user-id test-id question-id]
-  (let [q (iquestions/get-iquestion user-id test-id question-id)]
+   (let [q (iquestions/get-iquestion user-id test-id question-id)]
     (when-not (:result q)
       [:div
        (form-to [:post "../rank-question"]
@@ -181,16 +198,22 @@
                 [:p (submit-button "Rank")]
                 )])))
 
+(defn- has-unranked-questions [user-id test-id]
+  true
+  (let [questions (:questions (itests/get-itest user-id test-id))]
+    (some #(not ( :result (iquestions/get-iquestion user-id test-id %))) questions)))
+
 (defn- admin-user-test [user-id test-id]
   (let [user (users/get-user user-id)
         itest (itests/get-itest user-id test-id)]
-    [:div
-     [:hr]
-     [:p (users/get-user-name user) " (" user-id ")"]
-     (if (:finished itest)
-       [:p "Test finished at " (:finished itest)]
-       [:p "Test NOT finished"])
-     (map (partial rank-iquestion user-id test-id) (:questions itest))]))
+    (when (has-unranked-questions user-id test-id)
+      [:div
+       [:hr]
+       [:p (users/get-user-name user) " (" user-id ")"]
+       (if (:finished itest)
+         [:p "Test finished at " (:finished itest)]
+         [:p "Test NOT finished"])
+       (map (partial rank-iquestion user-id test-id) (:questions itest))])))
 
 (defn- admin-test-page [test-id]
   (let [user-ids (users/get-all-user-ids)]
@@ -281,6 +304,9 @@
        (with-admin user-id
          (with-test test-id
            (admin-test-page test-id))))  
+  (GET "/admin-users" {{user-id :user-id} :session}
+       (with-admin user-id
+         (manage-users)))  
   (GET "/view/:test-id" {{user-id :user-id} :session {test-id :test-id} :route-params}
        (with-user user-id
          (with-test test-id
