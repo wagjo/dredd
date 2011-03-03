@@ -9,6 +9,7 @@
 ;; Web server management. Purpose of this ns is to start and manage
 ;; web server which runs the dredd. Jetty is used as a web server.
 ;; Servlets and Application containers are not supported.
+;; Server settings are stored in dredd.local-settings/server
 
 ;;;; Implementation details
 
@@ -50,7 +51,8 @@
 
 (defn start-and-wait! [app]
   "Starts web server with supplied app. Blocks until server is stopped.
-  Throws RuntimeException if server already started"
+  Throws RuntimeException if server already started.
+  Server settings are in dredd.local-settings/server"
   (io!)
   (locking monitor                      ; eliminate race conditions
     (when server

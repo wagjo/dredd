@@ -13,4 +13,7 @@
   :warn-on-reflection true
   :main dredd.core
   :jvm-opts ["-Dfile.encoding=utf-8"
-             "-Dswank.encoding=utf-8"])
+             "-Dswank.encoding=utf-8"
+             "-Xms256m"
+             "-Xmx512m"
+             "-XX:MaxPermSize=256m"])

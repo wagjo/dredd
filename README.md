@@ -10,6 +10,9 @@ Simple Online Automated Judge System in Clojure. Mainly used in my Programming c
     * screen ./start.sh
     * then press C-a d
 
+* Starting with lein:
+    * lein run
+
 * Shutdown:
     * Use administrator web interface
 
@@ -17,16 +20,16 @@ Simple Online Automated Judge System in Clojure. Mainly used in my Programming c
     * resume with screen -r
     * then C-c to shutdown server
 
-* Hint: Start dredd on a dedicated port and use reverse proxy to make it public. That way you can also enable TLS for dredd.
-
-* Developer Hint: Do not forget to set UTF-8 in emacs
-    * M-x customize-group slime-lisp "Slime Net Coding System" utf-8-linux "Save for Future Sessions"
+* Notes:
+    * Start dredd on a dedicated port and use reverse proxy to make it public. That way you can also enable TLS for dredd.
+    * Developers: Do not forget to set UTF-8 in emacs
+        * M-x customize-group slime-lisp "Slime Net Coding System" utf-8-linux "Save for Future Sessions"
 
 ## Documentation
 
 As this is a literate programming attempt, documentation is in sources
 
-Start reading at dredd/server.clj
+Start reading at dredd/core.clj
 
 ## License
 
