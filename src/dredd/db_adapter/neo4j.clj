@@ -5,8 +5,6 @@
   "Neo4j wrapper, forked from hgavin/clojure-neo4j"
   (:import (org.neo4j.graphdb Direction
                               Node
-                              NotFoundException
-                              NotInTransactionException
                               PropertyContainer
                               Relationship
                               RelationshipType
@@ -58,6 +56,17 @@
     (name x) 
     (str x)))
 
+(defn- process-position [^TraversalPosition p]
+  "Translate TraversalPosition into a map"
+  {:pos p
+   :node (.currentNode p)
+   :depth (.depth p)
+   :start? (.isStartNode p)
+   :last-rel (.lastRelationshipTraversed p)
+   ;; FIXME: Following call causes NullPointerException
+   ;; :prev-node (.previousNode p)
+   :count (.returnedNodesCount p)})
+
 (defn- ^RelationshipType rel-type* [k]
   "Create java class implementing RelationshipType. Used for interop.
   TODO: Should we cache these instances to save memory?
@@ -67,12 +76,102 @@
 
 (defn- ^Direction rel-dir [k]
   "Translates keyword to the respective relationship direction.
+  Valid values are :out :in and :both
   See javadoc for Direction for more info on directions"
   (condp = k
       :out Direction/OUTGOING
       :in Direction/INCOMING
       :both Direction/BOTH
       (throw (IllegalArgumentException.))))
+
+(defn- rel-dir-map [r]
+  "Constructs an array or relation types and directions. Accepts
+  map consisting of relation type keywords as keys and
+  relation directions keywords (:in or :out) as values.
+  r canalso be a single keyword; in that case, a default :out will
+  be added to the array."
+  (if (keyword? r)
+    (rel-dir-map {r :out})   
+    (into-array Object
+                (mapcat (fn [[k v]] [(rel-type* k) (rel-dir v)])
+                        r))))
+
+(defn- order* [o]
+  "Translates keyword to the respective traverser order.
+  Valid values are :breadth, :depth and nil (will be :depth)
+  See javadoc for Traverser for more info in orders."
+  (cond
+   (= o :breadth) Traverser$Order/BREADTH_FIRST
+   (or (= o :depth) (nil? o)) Traverser$Order/DEPTH_FIRST
+   :else (throw (IllegalArgumentException.))))
+
+(defn- stop-if [f]
+  "Custom StopEvaluator, f should return true when at stop node. f takes one
+  argument. The function will be passed the current position map to act on."
+  (proxy [StopEvaluator] []
+    (isStopNode [^TraversalPosition p] (f (process-position p)))))
+
+(defn- depth-of [d]
+  "Return a StopEvaluator for the given traversal depth."
+  (if (== d 1) 
+    StopEvaluator/DEPTH_ONE
+    (stop-if #(== (:depth %) d))))
+
+(defn- stop-evaluator [e]
+  "Translates value to the respective stop evaluator.
+  Valid values are:
+    - :end or nil - end of graph
+    - :1, :2, :X (X being any positive integer) - depth of X
+    - Custom function which takes one argument, current position
+      and should return true when at stop node.
+  Examples: (stop-evaluator :8)
+            (stop-evaluator :1)
+            (stop-evaluator :end)
+            (stop-evaluator nil)
+            (stop-evaluator custom-fn)
+  See javadoc for StopEvaluator for more info."
+  (cond
+   (or (= :end e) (nil? e)) StopEvaluator/END_OF_GRAPH
+   (keyword? e) (depth-of (Integer/parseInt (name e)))
+   (fn? e) (stop-if e)))
+
+(defn- return-if [f]
+  "Custom ReturnableEvaluator, f should return true if node at current
+  position should be returned. Takes a function of one argument.
+  The function will be passed the current position map to act on."
+  (proxy [ReturnableEvaluator] []
+    (isReturnableNode [^TraversalPosition p] (f (process-position p)))))
+
+(defn- return-by-props [props]
+  "Creates a ReturnableEvaluator for use with a traverser that returns
+  nodes that match the specified property values. propmap is a map that
+  defines key value pairs that ReturnableEvaluator should match on."
+  (return-if
+   (fn [pos]
+     (let [^Node node (:node pos)
+           check-prop (fn [[k v]] (= v (.getProperty node (name-or-str k) nil)))]
+       (every? check-prop props)))))
+
+(defn- return-evaluator [e]
+  "Translates value to the respective return evaluator.
+  Valid values are:
+    - :all-but-start or nil  - all but start nodes
+    - :all - all nodes
+    - Custom function which takes one argument, current position map
+      and should return true when node at current position should be returned.
+    - Map that defines key-value pairs that ReturnableEvaluator
+      should match on specified property values.
+  Examples: (return-evaluator :all)
+            (return-evaluator :all-but-start)
+            (return-evaluator nil)
+            (return-evaluator custom-fn)
+            (return-evaluator {:uid \"johndoe1\"})
+  See javadoc for ReturnEvaluator for more info."
+  (cond
+   (or (= :all-but-start e) (nil? e)) ReturnableEvaluator/ALL_BUT_START_NODE
+   (= :all e) ReturnableEvaluator/ALL
+   (map? e) (return-by-props e)
+   (fn? e) (return-if e)))
 
 (defn- start! [path]
   "Establish a connection to the database.
@@ -85,17 +184,6 @@
   "Closes a connection stored in *neo-db*"
   (io!)
   (.shutdown *neo-db*))
-
-(defn- process-position [^TraversalPosition p]
-  "Translate TraversalPosition into a map"
-  {:pos p
-   :node (.currentNode p)
-   :depth (.depth p)
-   :start? (.isStartNode p)
-   :last-rel (.lastRelationshipTraversed p)
-   ;; FIXME: Following call causes NullPointerException
-   ;; :prev-node (.previousNode p)
-   :count (.returnedNodesCount p)})
 
 
 ;;;; Public API
@@ -177,7 +265,7 @@
       (nil? direction) (rel? node type)
       :else (.hasRelationship node (rel-type* type) (rel-dir direction)))))
 
-(defn rel
+(defn rels
   "Returns all relationships attached to this node. Syntax:
   [node]                - All relationships
   [node type-or-types]  - Relationships of any of specified types with
@@ -203,7 +291,7 @@
   ([^Node node type direction]
      (cond
       (nil? type) (.getRelationships node (rel-dir direction))
-      (nil? direction) (rel node type)
+      (nil? direction) (rels node type)
       :else (.getRelationships node (rel-type* type) (rel-dir direction)))))
 
 (defn single-rel 
@@ -322,144 +410,62 @@
 
 ;;; Graph traversal helpers
 
-;; Nodes can be traversed either breadth first or depth first. A depth
-;; first traversal is often more likely to find one matching node
-;; before a breadth first traversal. A breadth first traversal will
-;; always find the closest matching nodes first, which means that
+;; Nodes can be traversed either :breadth first or :depth first. A
+;; :depth first traversal is often more likely to find one matching
+;; node before a :breadth first traversal. A :breadth first traversal
+;; will always find the closest matching nodes first, which means that
 ;; TraversalPosition.depth() will return the length of the shortest
 ;; path from the start node to the node at that position, which is not
-;; guaranteed for depth first traversals. (taken from Neo4j docs)
+;; guaranteed for :depth first traversals. (from Neo4j docs)
 
-;; A breadth first traversal usually needs to store more state about
-;; where the traversal should go next than a depth first traversal
-;; does. Depth first traversals are thus more memory efficient. (taken
-;; from Neo4j docs)
-
-(comment
-  :breadth
-  :depth
-  nil je depth
-  )
-(defn- order [o]
-  )
-
-(comment
-  :1
-  :2
-  :X
-  :end
-  nil je end
-  fn
-  )
-(defn- stop-eval [e]
-  )
-
-
-
-(def breadth-first ^{:doc "Sets a breadth first traversal meaning the traverser will traverse all relationships on the current depth before going deeper."}
-     Traverser$Order/BREADTH_FIRST)
-
-(def depth-first ^{:doc "Sets a depth first traversal meaning the traverser will go as deep as possible (increasing depth for each traversal) before traversing next relationship on same depth."}
-     Traverser$Order/DEPTH_FIRST)
-
-
-(defn depth-of [d]
-  "Return a StopEvaluator for the given traversal depth."
-  (if (== d 1) 
-    StopEvaluator/DEPTH_ONE
-    (proxy [StopEvaluator] []
-      (isStopNode [^TraversalPosition pos]
-                  (== (.depth pos) d)))))
-
-(def end-of-graph ^{:doc "Traverse until the end of the graph."}
-     StopEvaluator/END_OF_GRAPH)
-
-(defn stop-if [f]
-  "Custom StopEvaluator, f should return true when at stop node. f takes one
-  argument. The function will be passed the current position map to act on."
-  (proxy [StopEvaluator] []
-    (isStopNode [^TraversalPosition p] (f (process-position p)))))
-
-
-(def return-all ^{:doc "A returnable evaluator that returns all nodes encountered."}
-     ReturnableEvaluator/ALL)
-
-(def return-all-but-start ^{:doc "A returnable evaluator that returns all nodes except the start node."}
-     ReturnableEvaluator/ALL_BUT_START_NODE)
-
-(defn return-if [f]
-  "Custom ReturnableEvaluator, f should return true if node at current
-  position should be returned. Takes a function of one argument.
-  The function will be passed the current position map to act on."
-  (proxy [ReturnableEvaluator] []
-    (isReturnableNode [^TraversalPosition p] (f (process-position p)))))
-
-(defn return-by-props [props]
-  "Creates a ReturnableEvaluator for use with a traverser that returns
-  nodes that match the specified property values. propmap is a map that
-  defines key value pairs that should ReturnableEvaluator should match
-  on."
-  (return-if
-   (fn [pos]
-     (let [node (:node pos)
-           check-prop (fn [[k v]] (= v (.getProperty node (name-or-str k) nil)))]
-       (every? check-prop props)))))
-
-(defn old-return-by-props [props]
-  "Creates a ReturnableEvaluator for use with a traverser that returns
-  nodes that match the specified property values. propmap is a map that
-  defines key value pairs that should ReturnableEvaluator should match
-  on."
-  (return-if
-   (fn [pos]
-     (let [nodeprops (props (:node pos))
-	   ks (keys props)
-	   nks (count ks)]
-       (cond
-	(== nks 0) false
-	(== nks 1) (and (contains? nodeprops (first ks))
-			(= (get nodeprops (first ks))
-			   (get props (first ks))))
-	:else 
-	(let [propcomp (fn [key] (= (get nodeprops key) (get props key)))]
-	  (and (reduce #(and (contains? nodeprops %1)
-			     (contains? nodeprops %2))
-		       ks)
-	       (reduce #(and (propcomp %1) (propcomp %2)) ks))))))))
+;; A :breadth first traversal usually needs to store more state about
+;; where the traversal should go next than a :depth first traversal
+;; does. Depth first traversals are thus more memory efficient.
+;; (from Neo4j docs)
 
 ;;; Graph traversal
 
 (defn go [^Node node & types]
   "Walk through the graph by following specified relations. Returns last node.
-  Throws NullPointerException if graph cannot be traversed.
+  Throws NullPointerException if path is wrong.
   Throws NotFoundException if path is ambiguous."
   (let [next-node (fn [^Node node type]
                     (second (nodes (single-rel node type))))]
     (reduce next-node node types)))
 
-;; TODO: previest directions na keywordy
-
-(defn traverse [^Node node order stop-eval return-eval rel-dir-map]
+(defn traverse 
   "Traverse the graph. Starting at the given node, traverse the graph
-  in either bread-first or depth-first order, stopping based on 
-  stop-eval. The return-eval decides which nodes make it into the result.
-  The map of relationships and directions is used to decide which
-  edges to traverse."  
-  (lazy-seq
-   (.traverse node order stop-eval return-eval
-              (into-array Object
-                          (mapcat (fn [[k v]] [(relationship k) v])
-                                  rel-dir-map)))))
-
-(defn find-by-props [node rel propmap]
-  "Finds a node by traversing outward from start-node along
-  relationship relkey. The function looks for nodes with property
-  values matching the key value pairs in propmap."
-  (traverse node
-            depth-first
-            end-of-graph
-            (return-by-props propmap)
-            {rel outgoing}))
+  in specified order, stopping based on stop-eval. The return-eval
+  decides which nodes make it into the result. The rel is used to
+  decide which edges to traverse.
+  order - :breadth, :depth. Will be :depth if nil supplied.
+  stop-eval accepts following values:
+    - :end or nil - end of graph
+    - :1, :2, :X (X being any positive integer) - depth of X
+    - Custom function which takes one argument, current position
+      and should return true when at stop node.
+  return-eval accepts following values:
+    - :all-but-start or nil  - all but start nodes
+    - :all - all nodes
+    - Custom function which takes one argument, current position map
+      and should return true when node at current position should be returned.
+    - Map defining key-value pairs that will be matched against
+      properties of wanna-be returned nodes.
+  rel - a keyword representing relation type or a map where keys are
+        relation type keywords and values are directions (:in or :out)"
+  ([^Node node rel]
+     (traverse node nil nil nil rel))
+  ([^Node node return-eval rel]
+     (traverse node nil nil return-eval rel))
+  ([^Node node stop-eval return-eval rel]
+     (traverse node nil stop-eval return-eval rel))
+  ([^Node node order stop-eval return-eval rel]
+     (lazy-seq
+      (.traverse node
+                 (order* order)
+                 (stop-evaluator stop-eval)
+                 (return-evaluator return-eval)
+                 (rel-dir-map rel)))))
 
 ;;;; Examples
 
@@ -468,14 +474,16 @@
   (start! "neo-db")
 
   (traverse (root)
-            depth-first
-            end-of-graph
-            return-all
-            {:users outgoing})
+            :depth
+            :end
+            :all
+            {:foo :out})
 
-  (def a (map props (find-by-props (go (root) :users)
-                               :user
-                               {:uid "jw817dk"})))
+  (map props (traverse (root)
+                       {:property1 "value"}
+                       {:foo :out :bar :out}))
 
+  (count (traverse (go (root) :foo)
+                   :bar))
   
 )
