@@ -38,8 +38,8 @@
 ;;; Code notes:
 ;; - *neo-db* holds the current db instance, so that users do not have
 ;;   to supply db instance at each call to db operations. This
-;;   approach has of course its drawbacks, but I've found it suitable
-;;   for my purposes.
+;;   approach has of course its drawbacks (e.g. only one connection at
+;;   time), but I've found it suitable for my purposes.
 
 ;;;; Implementation details
 
@@ -58,12 +58,21 @@
     (name x) 
     (str x)))
 
-(defn- relationship [k]
-  "Create java class inplementing RelationshipType. Used for interop.
-  NOTE: Should we cache these instances to save memory?
+(defn- ^RelationshipType rel-type* [k]
+  "Create java class implementing RelationshipType. Used for interop.
+  TODO: Should we cache these instances to save memory?
   Or will they be GCd?"
   (proxy [RelationshipType] []
     (name [] (name k))))
+
+(defn- ^Direction rel-dir [k]
+  "Translates keyword to the respective relationship direction.
+  See javadoc for Direction for more info on directions"
+  (condp = k
+      :out Direction/OUTGOING
+      :in Direction/INCOMING
+      :both Direction/BOTH
+      (throw (IllegalArgumentException.))))
 
 (defn- start! [path]
   "Establish a connection to the database.
@@ -78,13 +87,14 @@
   (.shutdown *neo-db*))
 
 (defn- process-position [^TraversalPosition p]
-  (let [a (.currentNode p)]
-    (swank.core/break))
-  {:node (.currentNode p)
+  "Translate TraversalPosition into a map"
+  {:pos p
+   :node (.currentNode p)
    :depth (.depth p)
    :start? (.isStartNode p)
    :last-rel (.lastRelationshipTraversed p)
-   :prev-node (.previousNode p)
+   ;; FIXME: Following call causes NullPointerException
+   ;; :prev-node (.previousNode p)
    :count (.returnedNodesCount p)})
 
 
@@ -121,7 +131,8 @@
   "Deletes node or relationship.
   Only node which has no relationships attached to it can be deleted."
   (io!)
-  (.delete item))
+  (with-tx
+    (.delete item)))
 
 ;;; Relationships
 
@@ -129,94 +140,86 @@
 ;; node or when creating traversers.
 ;;
 ;; A relationship has a direction from a node's point of view. If a
-;; node is the start node of a relationship it will be an OUTGOING
+;; node is the start node of a relationship it will be an :out
 ;; relationship from that node's point of view. If a node is the end
-;; node of a relationship it will be an INCOMING relationship from
-;; that node's point of view. The BOTH direction is used when
+;; node of a relationship it will be an :in relationship from
+;; that node's point of view. The :both keyword is used when
 ;; direction is of no importance, such as "give me all" or "traverse
-;; all" relationships that are either OUTGOING or INCOMING. (taken
-;; from Neo4j javadoc)
-
-(def both ^{:doc "Defines both incoming and outgoing relationships."}
-     Direction/BOTH)
-
-(def incoming ^{:doc "Defines incoming relationships."}
-     Direction/INCOMING)
-
-(def outgoing  ^{:doc "Defines outgoing relationships."}
-     Direction/OUTGOING)
+;; all" relationships that are either :out or :in. (from Neo4j
+;; javadoc)
 
 (defn rel?
-  "Returns true if relationship exists, false otherwise.
-  Allowed arguments:
-  - [node] - test for any relationship
-  - [node direction] - any relationships with specified direction
-  - [node direction type] - relationship of specified type and
-                            of specified direction
-  - [node type & types] - relationship of any of specified types with
-                          any direction"
+  "Returns true if there are relationships attached to this node. Syntax:
+  [node]                - All relationships
+  [node type-or-types]  - Relationships of any of specified types with
+                          any direction
+  [node type direction] - Relationships of specified type and
+                          of specified direction. You can supply nil for
+                          one of the arguments if you do not care for
+                          either direction of relationship type
+  Valid directions are :in :out and :both, parameter type can be any keyword.
+  Examples: (rel? node)                  ; All rels
+            (rel? node :foo)             ; Rels of :foo type of any direction
+            (rel? node [:foo :bar :baz]) ; Rels of any of specified types,
+                                         ; any directions
+            (rel? node :foo :in)         ; Rels of :foo type, :in direction
+            (rel? node nil :in)          ; Rels of any type of :in direction
+            (rel? node :foo nil)         ; Use (rel? node :foo) instead"
   ([^Node node]
      (.hasRelationship node))
-  ([^Node node type-or-direction & types]
-     (let [direction-provided? (= Direction (class type-or-direction))
-           ^Direction dir (if direction-provided?
-                            type-or-direction
-                            both)
-           t (map relationship
-                  (if direction-provided?
-                    (do
-                      ;; if multiple types, direction is both
-                      (when (> (count types) 1)
-                        (throw (IllegalArgumentException.
-                                "Cannot specify direction if multiple types are requested")))
-                      types)
-                    (cons type-or-direction types)))]
-       (cond
-        (empty? t) (.hasRelationship node dir)
-        (= 1 (count t)) (.hasRelationship node (first t) dir)
-        ;; TODO: Is there a way to type hint array in following call?
-        :else (.hasRelationship node (into-array RelationshipType t))))))
+  ([^Node node type-or-types]
+     (let [t (map rel-type* (flatten [type-or-types]))]
+       ;; TODO: Is there a way to type hint array in following call?
+       (.hasRelationship node (into-array RelationshipType t))))
+  ([^Node node type direction]
+     (cond
+      (nil? type) (.hasRelationship node (rel-dir direction))
+      (nil? direction) (rel? node type)
+      :else (.hasRelationship node (rel-type* type) (rel-dir direction)))))
 
-(defn rels
-  "Returns all the relationships attached to this node.
-  Allowed arguments:
-  - [node] - All relationships
-  - [node direction] - All relationships with specified direction
-  - [node direction type] - Relationships of specified type and
-                            of specified direction
-  - [node type & types] - Relationships of any of specified types with
-                          any direction"
+(defn rel
+  "Returns all relationships attached to this node. Syntax:
+  [node]                - All relationships
+  [node type-or-types]  - Relationships of any of specified types with
+                          any direction
+  [node type direction] - Relationships of specified type and
+                          of specified direction. You can supply nil for
+                          one of the arguments if you do not care for
+                          either direction of relationship type
+  Valid directions are :in :out and :both, parameter type can be any keyword.
+  Examples: (rel node)                  ; All rels
+            (rel node :foo)             ; Rels of :foo type of any direction
+            (rel node [:foo :bar :baz]) ; Rels of any of specified types,
+                                        ; any directions
+            (rel node :foo :in)         ; Rels of :foo type, :in direction
+            (rel node nil :in)          ; Rels of any type of :in direction
+            (rel node :foo nil)         ; Use (rel node :foo) instead"
   ([^Node node]
      (.getRelationships node))
-  ([^Node node type-or-direction & types]
-     (let [direction-provided? (= Direction (class type-or-direction))
-           ^Direction dir (if direction-provided?
-                            type-or-direction
-                            both)
-           t (map relationship
-                  (if direction-provided?
-                    (do
-                      ;; if multiple types, direction is both
-                      (when (> (count types) 1)
-                        (throw (IllegalArgumentException.
-                                "Cannot specify direction if multiple types are requested")))
-                      types)
-                    (cons type-or-direction types)))]
-       (cond
-        (empty? t) (.getRelationships node dir)
-        (= 1 (count t)) (.getRelationships node (first t) dir)
-        ;; TODO: Is there a way to type hint array in following call?
-        :else (.getRelationships node (into-array RelationshipType t))))))
+  ([^Node node type-or-types]
+     (let [t (map rel-type* (flatten [type-or-types]))]
+       ;; TODO: Is there a way to type hint array in following call?
+       (.getRelationships node (into-array RelationshipType t))))
+  ([^Node node type direction]
+     (cond
+      (nil? type) (.getRelationships node (rel-dir direction))
+      (nil? direction) (rel node type)
+      :else (.getRelationships node (rel-type* type) (rel-dir direction)))))
 
-(defn single-rel [^Node node type direction]
+(defn single-rel 
   "Returns the only relationship for the node of the given type and
-  direction."
-  (.getSingleRelationship node (relationship type) direction))
+  direction.
+  Valid directions are :in :out and :both, defaults to :out"
+  ([^Node node type]
+     (single-rel node type :out))
+  ([^Node node type direction]
+     (.getSingleRelationship node (rel-type* type) (rel-dir direction))))
 
 (defn create-rel! [^Node from type ^Node to]
   "Create relationship of a supplied type between from and to nodes."
   (io!)
-  (.createRelationshipTo from to (relationship type)))
+  (with-tx
+    (.createRelationshipTo from to (rel-type* type))))
 
 (defn nodes [^Relationship r]
   "Returns the two nodes attached to the given relationship."
@@ -260,13 +263,14 @@
      (set-prop! c key nil))
   ([^PropertyContainer c key value]
      (io!)
-     (if value
-       ;; TODO: better support primivives and arrays of primitives
-       (.setProperty c (name-or-str key)
-                     (if (coll? value) ; handle multiple values
-                       (into-array String value)
-                       value))
-       (.removeProperty c (name-or-str key)))))
+     (with-tx
+       (if value
+         ;; TODO: better support primivives and arrays of primitives
+         (.setProperty c (name-or-str key)
+                       (if (coll? value) ; handle multiple values
+                         (into-array String value)
+                         value))
+         (.removeProperty c (name-or-str key))))))
 
 (defn set-props! [^PropertyContainer c props]
   "Sets properties for a given node or relationship.
@@ -274,8 +278,9 @@
   If a property value is nil, removes this property from the given
   node or relationship."
   (io!)
-  (doseq [[k v] props]
-    (set-prop! c k v)))
+  (with-tx
+    (doseq [[k v] props]
+      (set-prop! c k v))))
 
 ;;; Nodes
 
@@ -287,10 +292,12 @@
   "Creates a new node."
   ([]
      (io!)
-     (.createNode *neo-db*))
+     (with-tx
+       (.createNode *neo-db*)))
   ([props]
-     (doto (create-node!)
-       (set-props! props))))
+     (with-tx
+       (doto (create-node!)
+         (set-props! props)))))
 
 (defn create-child!
   "Creates a node that is a child of the specified parent node
@@ -300,16 +307,18 @@
      (create-child! (root) type props))
   ([node type props]
      (io!)
-     (let [child (create-node! props)]
-       (create-rel! node type child)
-       child)))
+     (with-tx
+       (let [child (create-node! props)]
+         (create-rel! node type child)
+         child))))
 
 (defn delete-node! [node]
   "Delete node and all its relationships."
   (io!)
-  (doseq [r (rels node)]
-    (delete! r))
-  (delete! node))
+  (with-tx
+    (doseq [r (rels node)]
+      (delete! r))
+    (delete! node)))
 
 ;;; Graph traversal helpers
 
@@ -325,6 +334,27 @@
 ;; where the traversal should go next than a depth first traversal
 ;; does. Depth first traversals are thus more memory efficient. (taken
 ;; from Neo4j docs)
+
+(comment
+  :breadth
+  :depth
+  nil je depth
+  )
+(defn- order [o]
+  )
+
+(comment
+  :1
+  :2
+  :X
+  :end
+  nil je end
+  fn
+  )
+(defn- stop-eval [e]
+  )
+
+
 
 (def breadth-first ^{:doc "Sets a breadth first traversal meaning the traverser will traverse all relationships on the current depth before going deeper."}
      Traverser$Order/BREADTH_FIRST)
@@ -404,7 +434,7 @@
   Throws NullPointerException if graph cannot be traversed.
   Throws NotFoundException if path is ambiguous."
   (let [next-node (fn [^Node node type]
-                    (second (nodes (single-rel node type outgoing))))]
+                    (second (nodes (single-rel node type))))]
     (reduce next-node node types)))
 
 ;; TODO: previest directions na keywordy
@@ -434,6 +464,8 @@
 ;;;; Examples
 
 (comment
+
+  (start! "neo-db")
 
   (traverse (root)
             depth-first
