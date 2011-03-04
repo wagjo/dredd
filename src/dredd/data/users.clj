@@ -76,6 +76,32 @@
             (add-user! auth-user))
           user-id)))))
 
+(defn old-login-user! [username password]
+  "Authenticate user and add it to database if not in it yet. Return user-id"
+  (io!)
+  ;; first see if is admin
+  (if (admin/authenticate-user username password)
+    "admin"
+    (if (and (= "guest" username)
+             (= "guest" password))
+      ;; guest account
+      (let [auth-user {:uid "guest"
+                       :givenName "Jozko"
+                       :sn "Mrkvicka"
+                       :cn "Jozko Mrkvicka"
+                       :mail "mail@mail.com"}]
+        (let [user-id (get-user-id auth-user)]
+          (when-not (get-user user-id)
+            (add-user! auth-user))
+          user-id))      
+      ;; log in as mortal user
+      (when-let [auth-user (ldap/authenticate-user username password
+                                                   [:uid :givenName :sn :cn :mail])]
+        (let [user-id (get-user-id auth-user)]
+          (when-not (get-user user-id)
+            (add-user! auth-user))
+          user-id)))))
+
 (defn set-user-group! [user-id group]
   (when (and group (not (empty? group)))
       (neo/with-tx

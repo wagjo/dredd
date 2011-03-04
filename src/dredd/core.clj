@@ -29,22 +29,24 @@
 
 ;;;; Public API
 
-(defn start []
-  "Start dredd"
+(defn start! []
+  "Start dredd. Because shutdown-agents is called at the end,
+  program should end after start finishes"
+  (io!)
   (neo/with-db!
     (data/init!)
     (server/start-and-wait! app/handler))
   (shutdown-agents))
 
 (defn -main [& args]
-  (start))
+  "Entry point if you run the .jar"
+  (start!))
 
 ;;;; Examples
 
 (comment
   
-  (start)                               ; Start dredd
-
-  (server/shutdown!)                    ; Shutdown dredd
+  (start)
+  (server/shutdown!)
   
 )
