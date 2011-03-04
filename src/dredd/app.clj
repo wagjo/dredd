@@ -311,6 +311,8 @@
   (route/resources "/")
   (route/not-found "Page not found"))
 
+;; TODO logging
+
 ;; Main App handler
 
 (def handler
