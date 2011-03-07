@@ -2,7 +2,7 @@
 
 (ns dredd.data
   "General data operations"
-  (:require [dredd.db-adapter.neo4j :as neo]))
+  (:require [borneo.core :as neo]))
 
 ;; General operations on data stored in Neo4j database. See files in
 ;; data/ directory for more operations.

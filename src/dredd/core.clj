@@ -3,7 +3,7 @@
 (ns dredd.core
   "Main entry point for dredd"
   (:require [dredd.data :as data]
-            [dredd.db-adapter.neo4j :as neo]
+            [borneo.core :as neo]
             [dredd.server :as server]
             [dredd.app :as app]))
 
