@@ -2,9 +2,9 @@
 
 (ns dredd.core
   "Main entry point for dredd"
-  (:require [dredd.data :as data]
-            [borneo.core :as neo]
+  (:require [borneo.core :as neo]
             [dredd.server :as server]
+            [dredd.data :as data]
             [dredd.app :as app]))
 
 ;; Main entry point in the dredd. Please see README before studying
@@ -45,7 +45,7 @@
 ;;;; Examples
 
 (comment
-  
+
   (start)
   (server/shutdown!)
   

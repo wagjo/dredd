@@ -1,9 +1,9 @@
-(ns dredd.data.itests
-  "Database stuff"
-  (:require [dredd.db-adapter.neo4j :as neo]
+(ns dredd.data.itest
+  "Handle test instances"
+  (:require [borneo.core :as neo]
+            [clj-time.core :as clj-time]            
             [dredd.data.users :as users]
-            [dredd.data.questions :as questions]
-            [clj-time.core :as clj-time]))
+            [dredd.data.questions :as questions]))
 
 ;; Helper Vars
 
