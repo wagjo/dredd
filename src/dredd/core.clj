@@ -3,6 +3,7 @@
 (ns dredd.core
   "Main entry point for dredd"
   (:require [borneo.core :as neo]
+            [dredd.local-settings :as settings]
             [dredd.server :as server]
             [dredd.data :as data]
             [dredd.app :as app]))
@@ -33,7 +34,7 @@
   "Start dredd. Because shutdown-agents is called at the end,
   program should end after start finishes"
   (io!)
-  (neo/with-db!
+  (neo/with-db! (:path settings/neo4j)
     (data/init!)
     (server/start-and-wait! app/handler))
   (shutdown-agents))
@@ -46,7 +47,7 @@
 
 (comment
 
-  (start)
+  (start!)
   (server/shutdown!)
   
 )

@@ -1,5 +1,8 @@
+;; Copyright (C) 2011, Jozef Wagner. All rights reserved. 
+
 (ns dredd.data.tests
-  "List of tests"
+  "List of tests."
+  (:refer-clojure :exclude [get])
   (:use [clojure.contrib.seq-utils :only [find-first]]))
 
 (def tests
@@ -16,5 +19,5 @@
     :name "Cvicenie 4"
     :questions ["q7" "q8"]}])
 
-(defn get-test [id]
+(defn get [id]
   (find-first #(= id (:id %)) tests))

@@ -4,7 +4,7 @@
   "Server management for dredd web app"
   (:import (org.mortbay.jetty Server))  
   (:require [ring.adapter.jetty :as adapter]
-            [dredd.local-settings :as local-settings]))
+            [dredd.local-settings :as settings]))
 
 ;; Web server management. Purpose of this ns is to start and manage
 ;; web server which runs the dredd. Jetty is used as a web server.
@@ -57,7 +57,7 @@
   (locking monitor                      ; eliminate race conditions
     (when server
       (throw (RuntimeException. "Server is already running")))
-    (let [params (merge {:join? false} local-settings/server)
+    (let [params (merge {:join? false} settings/server)
           s (doto (adapter/run-jetty app params)
               (.setGracefulShutdown graceful-timeout))]
       (alter-var-root #'server (fn [_] s))))

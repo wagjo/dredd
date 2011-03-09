@@ -25,7 +25,7 @@
       :cn "Administrator"
       :username "admin"
       :password "admin"
-      :role :admin})
+      :role :admin})                    ; Do not change this
 
 
 ;;;; Guest Account

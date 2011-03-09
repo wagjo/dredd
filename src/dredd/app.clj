@@ -1,3 +1,5 @@
+;; Copyright (C) 2011, Jozef Wagner. All rights reserved. 
+
 (ns dredd.app
   "App management"
   (:use compojure.core
@@ -6,14 +8,14 @@
         [incanter core excel])
   (:require [compojure.route :as route]
             [compojure.handler :as handler]
-            [dredd.data.tests :as tests]
-            [dredd.data.itests :as itests]
-            [dredd.data.users :as users]
-            [dredd.data :as data]
-            [dredd.local-settings :as local-settings]
-            [dredd.data.iquestions :as iquestions]
+            [dredd.local-settings :as settings]
             [dredd.db-adapter.neo4j :as neo]
-            [dredd.server :as server]))
+            [dredd.server :as server]
+            [dredd.data :as data]
+            [dredd.data.tests :as tests]
+            [dredd.data.itest :as itest]
+            [dredd.data.iquestion :as iquestion]
+            [dredd.data.user :as user]))
 
 ;; Implementation details
 
@@ -31,9 +33,9 @@
            (submit-button "Log in")))
 
 (defn- user-menu [user-id]
-  (let [user (users/get-user user-id)]
+  (let [user (user/get user-id)]
     [:p
-     (users/get-user-name user) " | "
+     (:cn user) " | "
      [:a {:href "choose"} "Vybrat cvicenie"] " | " ;; NOTE: localization
      [:a {:href "logout"} "Log out"]]))
 
@@ -45,8 +47,8 @@
      [:h1 "Zistovanie pripravenosti studentov na cvicenia z predmetu Programovanie"] ;; NOTE: localization
      (when message [:p [:b message]])
      (if user-id
-       (let [user (users/get-user user-id)]
-         (if (or (users/admin? user-id) (:group user))
+       (let [user (user/get user-id)]
+         (if (or (user/admin? user-id) (:group user))
            (user-menu user-id)
            (choose-group)))
        (login-form))])))
@@ -55,7 +57,7 @@
 
 (defn- login-page! [username password]
   (io!)
-  (let [user-id (users/login-user! username password)]
+  (let [user-id (user/login! username password)]
     (-> (redirect "main")
         (assoc :session (if user-id
                           {:user-id user-id}
@@ -68,17 +70,17 @@
       (assoc :session nil)))
 
 (defn- set-group! [user-id group]
-  (users/set-user-group! user-id group)
+  (user/set-group! user-id group)
   (redirect "main"))
 
 ;; Choosing test
 
 (defn- can-take-test [user-id test-id]
-  (let [itest (itests/get-itest user-id test-id)]
+  (let [itest (itest/get user-id test-id)]
     (or (nil? itest) (not (:finished itest)))))
 
 (defn- show-controls [user-id test-id]
-  (if (users/admin? user-id)
+  (if (user/admin? user-id)
     [:a {:href (str "admin/" test-id)} "Administracia"]
     (if (can-take-test user-id test-id)
       [:a {:href (str "test/" test-id)} "Otvor"]
@@ -96,7 +98,7 @@
 ;; Taking test
 
 (defn- print-iquestion [& ids]
-  (let [q (apply iquestions/get-iquestion ids)]
+  (let [q (apply iquestion/get ids)]
     [:div 
      [:p [:b "Question " (:id q) ": "] (:name q)]
      [:p [:i (:text q)]]
@@ -109,9 +111,9 @@
      :headers {}
      :body    "You have already finished this test"}
     ;; ready to take a test
-    (let [itest (or (itests/get-itest user-id test-id)
-                    (itests/add-itest! user-id (tests/get-test test-id)))
-          user (users/get-user user-id)]
+    (let [itest (or (itest/get user-id test-id)
+                    (data/add-itest! user-id (tests/get test-id)))
+          user (user/get user-id)]
       (html
        (html5
         [:body
@@ -126,7 +128,7 @@
 ;; Viewing test
 
 (defn- view-iquestion [& ids]
-  (let [q (apply iquestions/get-iquestion ids)]
+  (let [q (apply iquestion/get ids)]
     [:div 
      [:p [:b "Question " (:id q) ": "] (:name q)]
      [:p [:i (:text q)]]
@@ -136,8 +138,8 @@
      [:p [:i "Poznamka: "] (:comment q)]]))
 
 (defn- view-test-page [user-id test-id]
-  (let [itest (itests/get-itest user-id test-id)
-        user (users/get-user user-id)]
+  (let [itest (itest/get user-id test-id)
+        user (user/get user-id)]
     (html
      (html5
       [:body
@@ -151,7 +153,7 @@
 (defn- submit-test! [user-id test-id params]
   (io!)
   ;; TODO: only if not finished yet
-  (itests/submit-itest! user-id test-id params)
+  (data/submit-itest! user-id test-id params)
   (-> (redirect "main")
       (assoc :session {:user-id user-id
                        :message "Uspesne odoslane!"})))
@@ -160,13 +162,13 @@
 
 (defn- rank-test! [{:keys [student-id test-id question-id result comment]}]
   (io!)
-  (iquestions/rank-iquestion! student-id test-id question-id result comment)
+  (iquestion/rank! student-id test-id question-id result comment)
   (redirect (str "admin/" test-id)))
 
 ;; Manage users
 
 (defn- print-user [user-id]
-  (let [user (users/get-user user-id)]
+  (let [user (user/get user-id)]
     [:div
      [:hr]
      [:p "Id: " [:b (:uid user)]]
@@ -178,12 +180,12 @@
    (html5
     [:body
      [:h1 "User management"]
-     (map print-user (users/get-all-user-ids))])))
+     (map print-user (user/get-all))])))
 
 ;; Administrator interface
 
 (defn- rank-iquestion [user-id test-id question-id]
-   (let [q (iquestions/get-iquestion user-id test-id question-id)]
+   (let [q (iquestion/get user-id test-id question-id)]
     (when-not (:result q)
       [:div
        (form-to [:post "../rank-question"]
@@ -201,23 +203,23 @@
 
 (defn- has-unranked-questions [user-id test-id]
   true
-  (let [questions (:questions (itests/get-itest user-id test-id))]
-    (some #(not ( :result (iquestions/get-iquestion user-id test-id %))) questions)))
+  (let [questions (:questions (itest/get user-id test-id))]
+    (some #(not ( :result (iquestion/get user-id test-id %))) questions)))
 
 (defn- admin-user-test [user-id test-id]
-  (let [user (users/get-user user-id)
-        itest (itests/get-itest user-id test-id)]
+  (let [user (user/get user-id)
+        itest (itest/get user-id test-id)]
     (when (has-unranked-questions user-id test-id)
       [:div
        [:hr]
-       [:p (users/get-user-name user) " (" user-id ")"]
+       [:p (:cn user) " (" user-id ")"]
        (if (:finished itest)
          [:p "Test finished at " (:finished itest)]
          [:p "Test NOT finished"])
        (map (partial rank-iquestion user-id test-id) (:questions itest))])))
 
 (defn- admin-test-page [test-id]
-  (let [user-ids (users/get-all-user-ids)]
+  (let [user-ids (user/get-all)]
     (html
      (html5
       [:body
@@ -231,28 +233,28 @@
     [(str h "question") (str h "answer") (str h "result")]))
 
 (defn- question-body [user-id test-id question-id]
-  (let [q (iquestions/get-iquestion user-id test-id question-id)]
+  (let [q (iquestion/get user-id test-id question-id)]
     [(:text q) (:answer q) (str (:result q) "(" (:comment q) ")")]))
 
 (defn- test-header [{test-id :id}]
-  (let [qs (:questions (tests/get-test test-id))]
+  (let [qs (:questions (tests/get test-id))]
     (mapcat (partial question-header test-id) qs)))
 
 (defn- create-sheet-header []
   (cons "Name:" (mapcat test-header tests/tests)))
 
 (defn user-test-body [user-id {test-id :id}]
-  (let [qs (:questions (tests/get-test test-id))]
+  (let [qs (:questions (tests/get test-id))]
     (mapcat (partial question-body user-id test-id) qs)))
 
 (defn user-row [user-id]
-  (let [u (users/get-user user-id)]
-    (cons (users/get-user-name u)
+  (let [u (user/get user-id)]
+    (cons (:cn u)
           (mapcat (partial user-test-body user-id) tests/tests))))
 
 (defn- create-sheet-body []
   ;; each user has one row
-  (map user-row (users/get-all-user-ids))
+  (map user-row (user/get-all))
   )
 (defn- admin-export-page []
     (let [fname "temp.xls"
@@ -263,6 +265,8 @@
 
 ;; Middleware
 
+;; TODO: authorization
+
 (defmacro with-user [user-id & body]
   `(if (and ~user-id (not (data/maintenance?)))
      (do ~@body)
@@ -271,14 +275,14 @@
       :body    "You must be logged in to view this page!"}))
 
 (defmacro with-admin [user-id & body]
-  `(if (users/admin? ~user-id)
+  `(if (user/admin? ~user-id)
      (do ~@body)
      {:status  403
       :headers {}
       :body    "You must be administrator to view this page"}))
 
 (defmacro with-test [test-id & body]
-  `(if (tests/get-test ~test-id)
+  `(if (tests/get ~test-id)
      (do ~@body)
      {:status  403
       :headers {}
@@ -290,7 +294,7 @@
 
 (defroutes main-routes
   (GET "/" []
-       (redirect (str (:base-url local-settings/server) "/main")))
+       (redirect (str (:base-url settings/server) "/main")))
   (GET "/main" {{:keys [user-id message]} :session}
        (main-page user-id message))
   (GET "/choose" {{user-id :user-id} :session}

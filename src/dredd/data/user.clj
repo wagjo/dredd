@@ -4,8 +4,9 @@
   "Handle users."
   (:refer-clojure :exclude [get])  
   (:require [borneo.core :as neo]
-            [dredd.local-settings :as local-settings]
-            [dredd.authentication.ldap :as ldap]))
+            [dredd.local-settings :as settings]
+            [dredd.authentication :as authentication]
+            [dredd.ldap :as ldap]))
 
 ;;;; Implementation details
 
@@ -26,21 +27,43 @@
   [user-id]
   (first (neo/traverse (node-users) {:uid user-id} :user)))
 
-;; Users
+(declare get-node)
 
-(def get-name :cn)
+(defn- add!
+  "Add user to the database, if he not exists yet."
+  [props]
+  (io!)
+  (when-not (get-node (:uid props))
+    (neo/create-child! (node-users) :user props)))
 
-(def get-id :uid)
+;;;; Public API
+
+(defn admin?
+  "Returns true if user-id belong to the admin user."
+  [user-id]
+  (= user-id settings/admin))
+
+(def authorization-table
+     ;; operation role pairs, nil means no special role needed
+     {:user-ops nil
+      :admin-ops :admin})
+
+(defn authorized?
+  "Check if user is authorized to perform operation of given type."
+  [user-id operation]
+  (let [user-roles (set (flatten [(:role (get user-id))]))
+        required-roles (set (flatten [(authorization-table operation)]))]
+    (not (empty? (clojure.set/intersection user-roles required-roles)))))
 
 (defn get-node
-  "Get user node."
+  "Gets user node."
   [user-id]
   (some #(% user-id) [(partial get-special-user-node :admin)
                       (partial get-special-user-node :guest)
                       get-user-node]))
 
 (defn get
-  "Get user properties."
+  "Gets user properties."
   [user-id]
   (when-let [node (get-node user-id)]
     (neo/props node)))
@@ -53,38 +76,12 @@
 (defn get-all
   "Return all user ids."
   []
-  (map #(neo/prop % get-id) (get-all-nodes)))
-
-(defn add!
-  "Add user to the database, if he not exists yet."
-  [props]
-  (io!)
-  (when-not (get-node (get-id props))
-    (neo/create-child! (node-users) :user props)))
-
-(defn- auth-admin
-  "Authenticate admin. Returns his id or nil."
-  [username password]
-  (and (= username (:username local-settings/admin))
-       (= password (:password local-settings/admin))
-       (:uid local-settings/admin)))
-
-(defn- auth-guest
-  "Authenticate guest. Returns his id or nil."
-  [username password]
-  (and (= username (:username local-settings/guest))
-       (= password (:password local-settings/guest))
-       (:uid local-settings/guest)))
-
-(defn- auth-user
-  "Authenticate user and returns his id or nil."
-  [username password]
-  (some #(% username password) [auth-admin auth-guest ldap/auth-user]))
+  (map #(neo/prop % :uid) (get-all-nodes)))
 
 (defn login! [username password]
   "Authenticates user and add it to database if not in it yet. Returns user id."
   (io!)
-  (when-let [user-id (auth-user username password)]
+  (when-let [user-id (authentication/auth-user username password)]
     ;; if user has logged in for the first time, create his node
     (when-not (get-node user-id)
       (add! (ldap/get-user username password [:uid :cn :sn :givenName :mail])))

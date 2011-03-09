@@ -1,84 +1,48 @@
+;; Copyright (C) 2011, Jozef Wagner. All rights reserved. 
+
 (ns dredd.data.itest
-  "Handle test instances"
+  "Handle test instances."
+  (:refer-clojure :exclude [get])
   (:require [borneo.core :as neo]
             [clj-time.core :as clj-time]            
-            [dredd.data.users :as users]
-            [dredd.data.questions :as questions]))
+            [dredd.data.user :as user]))
 
-;; Helper Vars
+;;;; Implementation details
 
 (defn- node-itests []
-  "Get itests node"
-  (neo/go (neo/root) :itests))
+  "Gets itests node."
+  (neo/walk (neo/root) :itests))
 
-(defn- node-iquestions []
-  "Get iquestions node"
-  (neo/go (neo/root) :iquestions))
+;;;; Public API
 
-;; iTests
+(defn get-node [user-id test-id]
+  "Gets itest node."
+    (first (neo/traverse (user/get-node user-id)
+                         {:id test-id} :itest)))
+
+(defn get [user-id test-id]
+  "Gets itest."
+  (when-let [node (get-node user-id test-id)]
+    (neo/props node)))
 
 (defn itest? [user-id test-id]
-  "Determine whether user has instance of some test"
-    (not (empty? (neo/find-by-props
-                  (users/get-user-node user-id)
-                  :itest
-                  {:id test-id}))))
+  "Determine whether user has instance of some test."
+  (not (nil? (get-node user-id test-id))))
 
-(defn get-itest-node [user-id test-id]
-  "Get itest node"
-    (first (neo/find-by-props
-            (users/get-user-node user-id)
-            :itest
-            {:id test-id})))
+(defn get-user-itest-ids [user-id]
+  "Returns ids of all users itests."
+  (doall
+   (map #(neo/prop % :id)
+        (neo/traverse (user/get-node user-id) :itest))))
 
-(defn get-itest [user-id test-id]
-  "Get itest"
-    (when-let [result (get-itest-node user-id test-id)]
-      (neo/prop result)))
+(defn add! [user-id props]
+  "Adds new itest, returning its id. You have to add iquestions then."
+  (let [itest (neo/create-child! (user/get-node user-id) :itest props)]
+    (neo/create-rel! (node-itests) :itest itest)
+    (:id props)))
 
-(defn get-all-users-itest-ids [user-id]
-        (doall
-         (map #(:id (neo/prop %))
-              (neo/traverse (users/get-user-node user-id)
-                            neo/breadth-first
-                            (neo/depth-of 1)
-                            neo/all-but-start
-                            {:itest neo/outgoing}))))      
+(defn finish! [user-id test-id]
+  "Sets itest state to finished."
+  (let [node (get-node user-id test-id)]
+    (neo/set-prop! node :finished (str (clj-time/now)))))
 
-(defn add-itest! [user-id prop]
-  "Add new itest, returning its id"
-  (io!)
-    (neo/with-tx
-      ;; create itest
-      (let [itest (neo/create-child! (users/get-user-node user-id) :itest prop)]
-        (neo/create-relationship! (node-itests) :itest itest)
-        ;; create iquestions
-        (doseq [q (:questions prop)]
-          (let [qprop (questions/instantiate-question q)
-                iquestion (neo/create-child! itest :iquestion qprop)]
-            (neo/create-relationship! (node-iquestions)
-                                      :iquestion iquestion))))
-      prop))
-
-(defn- submit-question-node! [question-node prop]
-  "Submit iquestion"
-  (io!)
-    (neo/with-tx
-      (let [question-prop (neo/prop question-node)]
-        (neo/set-properties! question-node {:answer ((keyword (:id question-prop)) prop)}))))
-
-(defn submit-itest! [user-id test-id prop]
-  "Submit itest"
-  (io!)
-    (neo/with-tx
-      ;; find itest
-      (let [itest (get-itest-node user-id test-id)]
-        ;; update test
-        (neo/set-properties! itest {:finished (str (clj-time/now))})
-        ;; fill iquestions
-        (doseq [q (neo/traverse itest
-                                neo/breadth-first
-                                (neo/depth-of 1)
-                                neo/all-but-start
-                                {:iquestion neo/outgoing})]
-          (submit-question-node! q prop)))))

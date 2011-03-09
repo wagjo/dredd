@@ -3,7 +3,9 @@
 (ns dredd.data
   "General operations on data."
   (:require [borneo.core :as neo]
-            [dredd.local-settings :as settings]))
+            [dredd.local-settings :as settings]
+            [dredd.data.itest :as itest]
+            [dredd.data.iquestion :as iquestion]))
 
 ;; General operations on data stored in Neo4j database. See files in
 ;; data/ directory for more operations.
@@ -47,3 +49,21 @@
   ([] (set-maintenance! nil))
   ([status]
      (neo/set-prop! (neo/root) :maintenance status)))
+
+(defn add-itest!
+  "Adds new itest for the given user."
+  [user-id props]
+  (let [test-id (itest/add! user-id props)]
+    (doseq [question-id (:questions props)]
+      (iquestion/add! user-id test-id question-id))))
+
+(defn submit-itest! [user-id test-id answers]
+  "Submit itest."
+  (io!)
+  (neo/with-tx
+    ;; set itest state to finished
+    (itest/finish! user-id test-id)
+    ;; fill iquestions
+    (doseq [[question-id answer] answers]
+      (when (iquestion/exists? user-id test-id question-id) 
+        (iquestion/submit-answer! user-id test-id question-id answer)))))

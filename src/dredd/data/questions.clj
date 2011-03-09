@@ -1,5 +1,8 @@
+;; Copyright (C) 2011, Jozef Wagner. All rights reserved. 
+
 (ns dredd.data.questions
-  "List of questions"
+  "List of questions."
+  (:refer-clojure :exclude [get])
   (:use [clojure.contrib.seq-utils :only [find-first]]))
 
 (def questions
@@ -62,11 +65,11 @@
                            "pohne s karolom x krokov dopredu, maximalne vsak 5 krokov. To znamena, ze ak x bude vacsie ako 5, karol sa pohne iba 5 krokov. Mate k dispozicii funkciu movekx, ktora pohne karolom o x krokov dopredu "])
                 "a zakladne prikazy Karola a jazyka C.")}])
 
-(defn get-question [id]
+(defn get [id]
   (find-first #(= id (:id %)) questions))
 
-(defn instantiate-question [id]
-  (let [q (get-question id)]
+(defn instantiate [id]
+  (let [q (get id)]
     (assoc q :text ((:text q)))))
 
 ;; Examples
