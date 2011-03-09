@@ -8,7 +8,7 @@
                  [ring/ring-jetty-adapter "0.3.6"]
                  [hiccup "0.3.4"]
                  [clj-time "0.3.0-SNAPSHOT"]
-                 [borneo "0.1.0-SNAPSHOT"]
+                 [borneo "0.1.0"]
                  [incanter "1.2.3"]]
   :dev-dependencies [[swank-clojure "1.3.0-SNAPSHOT"]]
   :warn-on-reflection true

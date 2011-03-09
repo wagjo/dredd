@@ -48,13 +48,6 @@
      {:user-ops nil
       :admin-ops :admin})
 
-(defn authorized?
-  "Check if user is authorized to perform operation of given type."
-  [user-id operation]
-  (let [user-roles (set (flatten [(:role (get user-id))]))
-        required-roles (set (flatten [(authorization-table operation)]))]
-    (not (empty? (clojure.set/intersection user-roles required-roles)))))
-
 (defn get-node
   "Gets user node."
   [user-id]
@@ -67,6 +60,13 @@
   [user-id]
   (when-let [node (get-node user-id)]
     (neo/props node)))
+
+(defn authorized?
+  "Check if user is authorized to perform operation of given type."
+  [user-id operation]
+  (let [user-roles (set (flatten [(:role (get user-id))]))
+        required-roles (set (flatten [(authorization-table operation)]))]
+    (not (empty? (clojure.set/intersection user-roles required-roles)))))
 
 (defn get-all-nodes
   "Returns all user nodes."
