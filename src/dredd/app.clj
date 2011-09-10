@@ -79,7 +79,9 @@
 
 (defn- show-controls [user-id test-id]
   (if (users/admin? user-id)
-    [:a {:href (str "admin/" test-id)} "Administracia"]
+    [:p [:a {:href (str "admin/" test-id)} "Administracia"] " "
+     [:a {:href "export.xls"} "Export"]
+     ]
     (if (can-take-test user-id test-id)
       [:a {:href (str "test/" test-id)} "Otvor"]
       [:a {:href (str "view/" test-id)} "Pozri vysledky"])))
@@ -232,14 +234,19 @@
 
 (defn- question-body [user-id test-id question-id]
   (let [q (iquestions/get-iquestion user-id test-id question-id)]
-    [(:text q) (:answer q) (str (:result q) "(" (:comment q) ")")]))
+    [(:text q)
+     (:answer q)
+     (str (if (empty?
+                            (str (:result q) (comment "(" (:comment q) ")")))
+                         ""
+                         (str(:result q))))]))
 
 (defn- test-header [{test-id :id}]
   (let [qs (:questions (tests/get-test test-id))]
     (mapcat (partial question-header test-id) qs)))
 
 (defn- create-sheet-header []
-  (cons "Name:" (mapcat test-header tests/tests)))
+  (cons "Name:" (cons "Group:" (mapcat test-header tests/tests))))
 
 (defn user-test-body [user-id {test-id :id}]
   (let [qs (:questions (tests/get-test test-id))]
@@ -248,7 +255,8 @@
 (defn user-row [user-id]
   (let [u (users/get-user user-id)]
     (cons (users/get-user-name u)
-          (mapcat (partial user-test-body user-id) tests/tests))))
+          (cons (:group u)
+          (mapcat (partial user-test-body user-id) tests/tests)))))
 
 (defn- create-sheet-body []
   ;; each user has one row
