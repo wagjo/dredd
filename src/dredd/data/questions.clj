@@ -1,5 +1,8 @@
+;; Copyright (C) 2011, Jozef Wagner. All rights reserved. 
+
 (ns dredd.data.questions
-  "List of questions"
+  "List of questions."
+  (:refer-clojure :exclude [get])
   (:use [clojure.contrib.seq-utils :only [find-first]]))
 
 (def questions
@@ -183,11 +186,11 @@
 ;; funkcia, ktora nacitava cisla az kym neni 0
 
 
-(defn get-question [id]
+(defn get [id]
   (find-first #(= id (:id %)) questions))
 
-(defn instantiate-question [id]
-  (let [q (get-question id)]
+(defn instantiate [id]
+  (let [q (get id)]
     (assoc q :text ((:text q)))))
 
 ;; Examples

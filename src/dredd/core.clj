@@ -2,9 +2,10 @@
 
 (ns dredd.core
   "Main entry point for dredd"
-  (:require [dredd.data :as data]
-            [dredd.db-adapter.neo4j :as neo]
+  (:require [borneo.core :as neo]
+            [dredd.local-settings :as settings]
             [dredd.server :as server]
+            [dredd.data :as data]
             [dredd.app :as app]))
 
 ;; Main entry point in the dredd. Please see README before studying
@@ -29,21 +30,24 @@
 
 ;;;; Public API
 
-(defn start []
-  "Start dredd"
-  (neo/with-db!
+(defn start! []
+  "Start dredd. Because shutdown-agents is called at the end,
+  program should end after start finishes"
+  (io!)
+  (neo/with-db! (:path settings/neo4j)
     (data/init!)
     (server/start-and-wait! app/handler))
   (shutdown-agents))
 
 (defn -main [& args]
-  (start))
+  "Entry point if you run the .jar"
+  (start!))
 
 ;;;; Examples
 
 (comment
-  
-  (start)
+
+  (start!)
   (server/shutdown!)
   
 )

@@ -6,41 +6,52 @@
 
 ;;;; Web server
 (def server
-  {:base-url ""                         ; Base url for web app. Must
+     {:base-url ""                      ; Base url for web app. Must
                                         ; not end with slash. Can be
                                         ; empty.
-   :port 3000})                         ; Web server port.
+      :port 3000})                      ; Web server port.
 
 
 ;;;; Neo4j database
 (def neo4j
-  {:path "neo-db"})                     ; Path to where Neo4j database
+     {:path "neo-db"})                  ; Path to where Neo4j database
                                         ; is stored. Must not end with
                                         ; slash.
 
 
-;;;; Administrator credentials
+;;;; Administrator Account
 (def admin
-  {:username "admin"
-   :password "admin"})
+     {:uid "admin-user"                 ; Do not change this
+      :cn "Administrator"
+      :username "admin"
+      :password "admin"
+      :role :admin})                    ; Do not change this
+
+
+;;;; Guest Account
+(def guest
+     {:uid "guest-user"                 ; Do not change this
+      :cn "Guest"
+      :username "guest"
+      :password "guest"})
 
 
 ;;;; LDAP authentication
 ;; See clj-ldap docs for more information on some of these parameters.
 (def ldap
-  {:host "ldap.example.com:636"         ; Host and port of the ldap
+     {:host "ldap.example.com:636"      ; Host and port of the ldap
                                         ; server. Can also be a
                                         ; collection of strings
                                         ; representing multipe hosts.
-   :ssl? true
-   :connect-timeout 5000
-   :timeout 5000
-   ;; Function which constructs bind-dn based on user-id
-   :user-to-bind-dn (fn [user-id]
-                      (str "uid=" user-id ",ou=person,dc=example,dc=com"))})
+      :ssl? true
+      :connect-timeout 5000
+      :timeout 5000
+      ;; Function which constructs bind-dn based on user-id
+      :user-to-bind-dn (fn [user-id]
+                         (str "uid=" user-id ",ou=person,dc=example,dc=com"))})
 
 
 ;;;; Miscellaneous
 (def misc
-  {:temp-dir "temp"})                   ; Directory for temporary
+     {:temp-dir "temp"})                ; Directory for temporary
                                         ; files.
